@@ -3,7 +3,7 @@
 # 14-12-23
 
 
-from utils import colour
+from utils import *
 import sys
 from os import listdir, getcwd
 from os.path import isdir, isfile
@@ -15,7 +15,7 @@ def get_children(path: str) -> ([str], [str]):
         folders = get_subfolders(path)
         files = get_subfiles(path)
         return folders, files
-    except:
+    except FileNotFoundError:
         print(f"Error reading directory '{path}'")
 
 
@@ -53,6 +53,10 @@ def ensure_trailing_slash(path: str):
     return path
 
 
+def count_descendants(path: str) -> int:
+    return 15
+
+
 def main():
     working_dir = getcwd()
     working_dir = ensure_trailing_slash(working_dir)
@@ -64,6 +68,13 @@ def main():
 
     if not isdir(working_dir):
         raise NotADirectoryError("The provided path is not a directory")
+
+    file_count_warning_cutoff = 10
+    file_count = count_descendants(working_dir)
+    if file_count > file_count_warning_cutoff:
+        bool_input(
+            f"Warning: greater than {file_count_warning_cutoff} files - continue?")
+
     print_dir(working_dir)
 
 

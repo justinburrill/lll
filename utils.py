@@ -15,3 +15,21 @@ class colour:
 
     def blue(self, s: str) -> str:
         return self.BLUE + s + self.END
+
+
+def bool_input(prompt: str, default: bool = None) -> bool:
+    while True:
+        x = input(prompt).lower()
+        if x.strip() == "":
+            if default is not None:
+                return default
+            else:
+                print("No default provided.")
+                continue
+        elif x in ["y", "yes"]:
+            return True
+        elif x in ["n", "no"]:
+            return False
+        else:
+            print("Invalid input.")
+            continue
