@@ -14,3 +14,7 @@ Cargo.lock
 *.pdb
 
 __pycache__/
+
+
+dist/
+build/
