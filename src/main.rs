@@ -62,7 +62,11 @@ fn get_children(path: PathBuf) -> (Vec<PathBuf>, Vec<String>) {
 }
 
 fn get_children_str(path: String) -> (Vec<PathBuf>, Vec<String>) {
-    let dir_iterator = fs::read_dir(path).unwrap();
+    let dir_iterator = fs::read_dir(path.clone());
+    let dir_iterator = match dir_iterator {
+        Ok(itr) => itr,
+        Err(err) => panic!("could not read path {:?} - {:?}", &path, err),
+    };
     let mut subdirs = Vec::new();
     let mut subfiles = Vec::new();
     for result in dir_iterator {
