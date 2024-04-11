@@ -2,11 +2,9 @@ use colored::Colorize;
 use std::env;
 use std::fs;
 use std::path::PathBuf;
-mod utils;
-
-fn get_cwd() -> PathBuf {
-    env::current_dir().unwrap()
-}
+mod input;
+mod paths;
+use crate::paths::*;
 
 fn print_vec(v: Vec<String>) {
     for x in v {
@@ -24,28 +22,9 @@ fn get_cwd_str() -> String {
     pathbuf_to_str(env::current_dir().unwrap())
 }
 
-fn enforce_trailing_slash(mut s: String) -> String {
-    if s.as_bytes()[s.len() - 1] != b'/' {
-        if s.contains('\\') {
-            s.push('\\')
-        } else {
-            s.push('/')
-        }
-    }
-    s
-}
-
 // fn pathbuf_vec_to_string_vec(paths: Vec<PathBuf>) -> Vec<String> {
 //     paths.iter().map(pathbuf_ref_to_str).collect()
 // }
-
-fn pathbuf_to_str(p: PathBuf) -> String {
-    p.into_os_string().into_string().unwrap()
-}
-
-fn pathbuf_ref_to_str(p: &PathBuf) -> String {
-    p.clone().into_os_string().into_string().unwrap()
-}
 
 fn get_path_str_tail(p: String) -> String {
     // println!("{}", p);
@@ -91,18 +70,18 @@ fn buffer_spaces_vec(strings: Vec<String>, level: usize, space_count: usize) -> 
 }
 
 // sexy recursion
-fn get_descendant_count(path: PathBuf, file_count_warning_cutoff: usize) -> usize {
-    let mut total_child_count: usize = 0;
-    let (subdirs, subfiles) = get_children(path);
-    total_child_count += subdirs.len() + subfiles.len();
-    for subdir in subdirs {
-        total_child_count += get_descendant_count(subdir, file_count_warning_cutoff);
-        if total_child_count > file_count_warning_cutoff {
-            return total_child_count;
-        }
-    }
-    total_child_count
-}
+// fn get_descendant_count(path: PathBuf, file_count_warning_cutoff: usize) -> usize {
+//     let mut total_child_count: usize = 0;
+//     let (subdirs, subfiles) = get_children(path);
+//     total_child_count += subdirs.len() + subfiles.len();
+//     for subdir in subdirs {
+//         total_child_count += get_descendant_count(subdir, file_count_warning_cutoff);
+//         if total_child_count > file_count_warning_cutoff {
+//             return total_child_count;
+//         }
+//     }
+//     total_child_count
+// }
 
 fn buffer_spaces(str: String, level: usize, space_count: usize) -> String {
     " ".repeat(level * space_count) + &str
@@ -147,40 +126,47 @@ fn print_dir(path: PathBuf, level: usize) {
     print_vec(buffer_spaces_vec(subfiles, level, space_count));
 }
 
-fn str_to_pathbuf(s: String) -> PathBuf {
-    let parts = s.split("/");
-    let mut path = PathBuf::new();
-    for part in parts {
-        path.push(part);
-    }
-    path
-}
-
 fn main() {
-    // let p = PathBuf::from(r"C:\src\cli_tools\super_search\one\one.md");
-    // println!("{}", p.is_dir());
-
     let args: Vec<String> = env::args().collect();
-    let mut current_working_directory: String = get_cwd_str();
+
+    // ensure that the cwd has the slash at the end
+    let current_working_directory: String = enforce_trailing_slash(get_cwd_str());
+
+    let mut paths_to_search: Vec<String> = Vec::new();
+
     if args.len() > 1 {
-        let mut path_ext = args[1].clone();
-        path_ext = path_ext.replace("\\", "/");
-        current_working_directory = enforce_trailing_slash(current_working_directory);
-        current_working_directory.push_str(&path_ext);
+        for arg in args {
+            // copy path from the cmd line arguments
+            let path_ext = &arg;
+
+            // replace back slashes from user inputwith forward slashes
+            //path_ext = path_ext.replace("\\", "/");
+            // push the modified path ending to the cwd
+            paths_to_search.push(current_working_directory.clone() + path_ext);
+        }
+    } else {
+        // if there is no path given in the cmd arguments,
+        // then add the cwd to the paths to be scanned
     }
+
+    // unused file count warning
+    // TODO: fix this
     // println!("working directory: {}", current_working_directory);
     // let file_count_warning_cutoff: usize = 10;
     // if get_descendant_count(get_cwd(), file_count_warning_cutoff) > file_count_warning_cutoff {
     //     let prompt = String::from("Warning: greater than ")
     //         + file_count_warning_cutoff.to_string().as_str()
     //         + " files - continue?";
-
     //     let default = false;
-    //     if utils::bool_input(prompt, default) {
+    //     if input::bool_input(prompt, default) {
     //         // keep going :)
     //     } else {
     //         return;
     //     }
     // }
-    print_dir(str_to_pathbuf(current_working_directory), 0);
+
+    // search each path
+    for path in paths_to_search {
+        print_dir(str_to_pathbuf(path), 0);
+    }
 }
