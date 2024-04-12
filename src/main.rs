@@ -12,32 +12,22 @@ fn print_vec(v: Vec<String>) {
     }
 }
 
-fn get_cwd_str() -> String {
-    // let path = env::current_dir()
-    //     .unwrap()
-    //     .into_os_string()
-    //     .into_string()
-    //     .unwrap();
-    // path
-    pathbuf_to_str(env::current_dir().unwrap())
-}
-
 // fn pathbuf_vec_to_string_vec(paths: Vec<PathBuf>) -> Vec<String> {
 //     paths.iter().map(pathbuf_ref_to_str).collect()
 // }
 
-fn get_path_str_tail(p: String) -> String {
+fn get_string_path_tail(p: String) -> String {
     // println!("{}", p);
     let parts: Vec<&str> = p.split("\\").collect();
     parts[parts.len() - 1].to_string()
 }
 
-fn get_path_tail(p: &PathBuf) -> String {
-    get_path_str_tail(pathbuf_ref_to_str(p))
+fn get_path_tail_string(p: &PathBuf) -> String {
+    get_string_path_tail(pathbuf_ref_to_string(p))
 }
 
 fn get_children(path: PathBuf) -> (Vec<PathBuf>, Vec<String>) {
-    get_children_str(pathbuf_to_str(path))
+    get_children_str(pathbuf_to_string(path))
 }
 
 fn get_children_str(path: String) -> (Vec<PathBuf>, Vec<String>) {
@@ -54,7 +44,7 @@ fn get_children_str(path: String) -> (Vec<PathBuf>, Vec<String>) {
             // println!("subdir {} found", pathbuf_ref_to_string(&p));
             subdirs.push(p)
         } else {
-            subfiles.push(get_path_tail(&p));
+            subfiles.push(get_path_tail_string(&p));
         }
     }
     (subdirs, subfiles)
@@ -63,13 +53,13 @@ fn get_children_str(path: String) -> (Vec<PathBuf>, Vec<String>) {
 fn buffer_spaces_vec(strings: Vec<String>, level: usize, space_count: usize) -> Vec<String> {
     let mut strings2: Vec<String> = Vec::new();
     for str in strings {
-        strings2.push(buffer_spaces(str, level, space_count));
+        strings2.push(buffer_spaces_string(str, level, space_count));
         // println!("{} spaces added to {}", level * space_count, str.clone());
     }
     strings2
 }
 
-// sexy recursion
+// sexy recursion TODO: unused
 // fn get_descendant_count(path: PathBuf, file_count_warning_cutoff: usize) -> usize {
 //     let mut total_child_count: usize = 0;
 //     let (subdirs, subfiles) = get_children(path);
@@ -83,12 +73,12 @@ fn buffer_spaces_vec(strings: Vec<String>, level: usize, space_count: usize) -> 
 //     total_child_count
 // }
 
-fn buffer_spaces(str: String, level: usize, space_count: usize) -> String {
+fn buffer_spaces_string(str: String, level: usize, space_count: usize) -> String {
     " ".repeat(level * space_count) + &str
 }
 
 fn is_empty_dir(path: &PathBuf) -> bool {
-    let (subdirs, subfiles) = get_children_str(pathbuf_ref_to_str(path));
+    let (subdirs, subfiles) = get_children_str(pathbuf_ref_to_string(path));
     subdirs.len() + subfiles.len() == 0
 }
 
@@ -101,14 +91,14 @@ fn print_dir(path: PathBuf, level: usize) {
         // print name of dir in bold
         println!(
             "{}",
-            buffer_spaces(get_path_tail(&subdir), level, space_count)
+            buffer_spaces_string(get_path_tail_string(&subdir), level, space_count)
                 .bold()
                 .blue()
         );
         if is_empty_dir(&subdir) {
             println!(
                 "{}",
-                buffer_spaces(String::from("<Empty dir>"), level + 1, space_count).italic()
+                buffer_spaces_string(String::from("<Empty dir>"), level + 1, space_count).italic()
             );
         } else {
             if level < max_depth {
@@ -116,8 +106,12 @@ fn print_dir(path: PathBuf, level: usize) {
             } else {
                 println!(
                     "{}",
-                    buffer_spaces(String::from("<Max depth reached>"), level + 1, space_count)
-                        .italic()
+                    buffer_spaces_string(
+                        String::from("<Max depth reached>"),
+                        level + 1,
+                        space_count
+                    )
+                    .italic()
                 );
             }
         }
@@ -127,13 +121,14 @@ fn print_dir(path: PathBuf, level: usize) {
 }
 
 fn main() {
+    // collect cmd line args
     let args: Vec<String> = env::args().collect();
-
     // ensure that the cwd has the slash at the end
-    let current_working_directory: String = enforce_trailing_slash(get_cwd_str());
-
+    let current_working_directory: String =
+        enforce_trailing_slash(pathbuf_to_string(get_cwd_path()));
+    // vector to hold the paths to be searched
     let mut paths_to_search: Vec<String> = Vec::new();
-
+    // if there are args given by the user,
     if args.len() > 1 {
         for arg in args {
             // copy path from the cmd line arguments
@@ -167,6 +162,7 @@ fn main() {
 
     // search each path
     for path in paths_to_search {
-        print_dir(str_to_pathbuf(path), 0);
+        println!("{}", path);
+        print_dir(string_to_pathbuf(path), 0);
     }
 }
