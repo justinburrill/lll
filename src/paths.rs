@@ -1,8 +1,5 @@
 use dirs_next;
-use std::{
-    env,
-    path::{Path, PathBuf},
-};
+use std::{env, path::PathBuf};
 
 pub fn string_to_pathbuf(s: String) -> PathBuf {
     let mut parts: Vec<&str> = s.split("/").collect();
@@ -16,10 +13,7 @@ pub fn string_to_pathbuf(s: String) -> PathBuf {
     path
 }
 
-pub fn str_to_pathbuf(s: &str) -> PathBuf {
-    string_to_pathbuf(s.to_owned())
-}
-
+/// Returns a [`PathBuf`] to the user's home directory
 fn home_path() -> PathBuf {
     let home_path = dirs_next::home_dir();
     // let home_path: PathBuf = match home_path {
@@ -51,15 +45,18 @@ pub fn get_cwd_path() -> PathBuf {
 pub fn handle_path(path_str: String) -> PathBuf {
     // TODO: fix support usage of . and ~
     // using https://lib.rs/install/dirs-next
+
+    // This should never happen
     if path_str.len() == 0 {
         return PathBuf::new();
     }
 
     // if the first char is a '~',
     if path_str.chars().nth(0).unwrap() == '~' {
+        // println!("replacing ~ with home path");
         // then replace '~' with home dir
         let path_ext_str = &path_str[1..];
-        let path: PathBuf = str_to_pathbuf(path_ext_str);
+        let path: PathBuf = string_to_pathbuf(path_ext_str.to_owned());
         return add_paths(home_path(), path);
     }
 

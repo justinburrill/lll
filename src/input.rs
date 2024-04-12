@@ -1,4 +1,4 @@
-// use std::io::{self, BufRead, Error};
+use std::io::{self, BufRead, Error};
 
 // pub fn bool_input(prompt: String, default: bool) -> bool {
 //     let yes_statements: Vec<&str> = vec!["y", "yes", "yeah", "yup"];
@@ -19,19 +19,12 @@
 //     }
 // }
 
-// fn input(prompt: String) -> Result<String, Error> {
-//     print!("{}", prompt);
-//     // let stdin = io::stdin();
-//     // let line1 = stdin.lock().lines().next().unwrap().unwrap();
-//     let mut user_in = String::new();
-//     let stdin = io::stdin();
-//     stdin
-//         .lock()
-//         .read_line(&mut user_in)
-//         .expect("Could not read line");
-//     // let user_in = match user_in {
-//     //     Ok(str) => str,
-//     //     Err(error) => panic!("Problem reading input 😭😭: {:?}", error),
-//     // };
-//     Ok(user_in)
-// }
+fn input(prompt: String) -> String {
+    print!("{}", prompt);
+    let mut input_string = String::new();
+
+    match io::stdin().read_line(&mut input_string) {
+        Ok(_) => input_string,
+        Err(error) => panic!("Problem reading input 😭😭: {:?}", error),
+    }
+}

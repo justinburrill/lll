@@ -1,20 +1,12 @@
+use colored::ColoredString;
 use colored::Colorize;
+use dirs_next::home_dir;
 use std::env;
 use std::fs;
 use std::path::PathBuf;
 mod input;
 mod paths;
 use crate::paths::*;
-
-fn print_vec(v: Vec<String>) {
-    for x in v {
-        println!("{}", x)
-    }
-}
-
-// fn pathbuf_vec_to_string_vec(paths: Vec<PathBuf>) -> Vec<String> {
-//     paths.iter().map(pathbuf_ref_to_str).collect()
-// }
 
 fn get_string_path_tail(p: String) -> String {
     // println!("{}", p);
@@ -27,10 +19,6 @@ fn get_path_tail_string(p: &PathBuf) -> String {
 }
 
 fn get_children(path: PathBuf) -> (Vec<PathBuf>, Vec<String>) {
-    get_children_str(pathbuf_to_string(path))
-}
-
-fn get_children_str(path: String) -> (Vec<PathBuf>, Vec<String>) {
     let dir_iterator = fs::read_dir(path.clone());
     let dir_iterator = match dir_iterator {
         Ok(itr) => itr,
@@ -73,18 +61,20 @@ fn buffer_spaces_vec(strings: Vec<String>, level: usize, space_count: usize) -> 
 //     total_child_count
 // }
 
+/// Adds a number of spaces to the start of a [`String`]
 fn buffer_spaces_string(str: String, level: usize, space_count: usize) -> String {
     " ".repeat(level * space_count) + &str
 }
 
 fn is_empty_dir(path: &PathBuf) -> bool {
-    let (subdirs, subfiles) = get_children_str(pathbuf_ref_to_string(path));
+    let (subdirs, subfiles) = get_children(path.clone());
     subdirs.len() + subfiles.len() == 0
 }
 
 fn print_dir(path: PathBuf, level: usize) {
     let space_count: usize = 4;
     let max_depth: usize = 5;
+    let max_subfiles_to_print: usize = 3;
 
     let (subdirs, subfiles) = get_children(path.clone());
     for subdir in subdirs {
@@ -98,7 +88,11 @@ fn print_dir(path: PathBuf, level: usize) {
         if is_empty_dir(&subdir) {
             println!(
                 "{}",
-                buffer_spaces_string(String::from("<Empty dir>"), level + 1, space_count).italic()
+                format_notify_string(buffer_spaces_string(
+                    String::from("<Empty dir>"),
+                    level + 1,
+                    space_count
+                ))
             );
         } else {
             if level < max_depth {
@@ -106,42 +100,68 @@ fn print_dir(path: PathBuf, level: usize) {
             } else {
                 println!(
                     "{}",
-                    buffer_spaces_string(
+                    format_notify_string(buffer_spaces_string(
                         String::from("<Max depth reached>"),
                         level + 1,
                         space_count
-                    )
-                    .italic()
+                    ))
                 );
             }
         }
     }
     // println!("{} subfiles:", pathbuf_ref_to_string(&path));
-    print_vec(buffer_spaces_vec(subfiles, level, space_count));
+    // print_vec(
+    // buffer_spaces_vec(subfiles, level, space_count),
+    // max_subfiles_to_print,
+    // );
+
+    let mut printed_file_count: usize = 0;
+    let strings_to_be_printed = buffer_spaces_vec(subfiles, level, space_count);
+    let string_count = strings_to_be_printed.len();
+    for line in strings_to_be_printed {
+        println!("{}", line);
+        printed_file_count += 1;
+        if printed_file_count > max_subfiles_to_print {
+            let remaining_files = string_count - printed_file_count;
+            let s: String = buffer_spaces_string(
+                format!("<{} more files>", remaining_files),
+                level,
+                space_count,
+            );
+            println!("{}", format_notify_string(s));
+            break;
+        }
+    }
+}
+
+fn format_notify_string(s: String) -> ColoredString {
+    s.italic().bold().dimmed()
 }
 
 fn main() {
+    // println!("{}", home_dir().unwrap().to_str().unwrap());
+
     // collect cmd line args
     let args: Vec<String> = env::args().collect();
     // ensure that the cwd has the slash at the end
-    let current_working_directory: String =
-        enforce_trailing_slash(pathbuf_to_string(get_cwd_path()));
+    let current_working_directory: PathBuf = get_cwd_path();
     // vector to hold the paths to be searched
-    let mut paths_to_search: Vec<String> = Vec::new();
+    let mut paths_to_search: Vec<PathBuf> = Vec::new();
     // if there are args given by the user,
     if args.len() > 1 {
         for arg in args {
             // copy path from the cmd line arguments
-            let path_ext = &arg;
-
+            let path_ext = handle_path(arg);
             // replace back slashes from user inputwith forward slashes
             //path_ext = path_ext.replace("\\", "/");
             // push the modified path ending to the cwd
-            paths_to_search.push(current_working_directory.clone() + path_ext);
+            paths_to_search.push(add_paths(current_working_directory.clone(), path_ext));
         }
     } else {
+        // TODO:
         // if there is no path given in the cmd arguments,
         // then add the cwd to the paths to be scanned
+        paths_to_search.push(current_working_directory);
     }
 
     // unused file count warning
@@ -162,7 +182,8 @@ fn main() {
 
     // search each path
     for path in paths_to_search {
-        println!("{}", path);
-        print_dir(string_to_pathbuf(path), 0);
+        let message: ColoredString = format!("Searching 👉👉 {}", path.to_str().unwrap()).bold();
+        println!("{}", message);
+        // print_dir(path, 0);
     }
 }
