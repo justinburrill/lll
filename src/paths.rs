@@ -3,6 +3,8 @@ use std::{env, path::PathBuf};
 
 use crate::get_children;
 
+// Auto-implement clone for type FilePathh
+#[derive(Clone)]
 pub struct FilePath {
     location: PathBuf,
 }
@@ -45,50 +47,66 @@ impl FilePath {
 
     pub fn append(&self, other: FilePath) -> FilePath {
         // appends p2 to p1
-        self.location.join(other.location);
-        *self.to_owned()
+        FilePath::new(self.location.join(other.location))
     }
 
     pub fn get_item_name(&self) -> String {
         let self_string = self.to_string();
         let x: Vec<&str> = self_string.split("/").collect();
-        x.get(x.len()).unwrap().to_string()
+        x.get(x.len() - 1).expect("error msg").to_string()
     }
 
     pub fn is_file(&self) -> bool {
         self.location.is_file()
     }
 
-    pub fn is_dir(&self) -> bool {
+    pub fn is_directory(&self) -> bool {
         self.location.is_dir()
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.is_dir() && get_children(*self).len().eq(&0)
+    pub fn is_empty_dir(&self) -> bool {
+        self.is_directory() && get_children(self).len().eq(&0)
+    }
+
+    pub fn is_absolute(&self) -> bool {
+        self.location.is_absolute()
     }
 }
 
 impl ToString for FilePath {
     fn to_string(&self) -> String {
-        self.location.as_mut_os_string().into_string().unwrap()
+        self.location
+            .to_str()
+            .expect("Error converting FilePath to String")
+            .to_owned()
     }
 }
+
+// impl Deref for FilePath {
+//     type Target = FilePath;
+//     fn deref(&self) -> &Self::Target {
+//         &self
+//     }
+// }
 
 pub fn handle_path(path_str: String) -> FilePath {
     // TODO: fix support usage of . and ~
     // using https://lib.rs/install/dirs-next
 
-    let chars = path_str.chars();
-    // if the first char is a '~',
-    if chars.clone().nth(0).unwrap() == '~' {
-        // println!("replacing ~ with home path");
-        // then replace '~' with home dir
-        let path_ext_str = &path_str[1..];
-        let path: FilePath = FilePath::from_string(path_ext_str.to_owned());
-        return FilePath::get_home_path().append(path);
-    }
+    // let chars = path_str.chars();
 
-    return FilePath::from_string(path_str);
+    let no_prefix = path_str[1..].to_owned().strip_prefix("/").unwrap();
+    if path_str.starts_with("~") {
+        // then replace '~' with home dir
+        let path: FilePath = FilePath::from_string(no_prefix.to_owned());
+        return FilePath::get_home_path().append(path);
+    } else if path_str.starts_with("./") {
+        let path: FilePath = FilePath::from_string(no_prefix.to_owned());
+        return FilePath::get_cwd_path().append(path);
+    } else {
+        // no special stuff
+        return FilePath::from_string(path_str);
+    }
 }
 
 pub fn enforce_leading_slash(mut path_str: String) -> String {
@@ -109,10 +127,10 @@ fn find_slash_type(s: &str) -> char {
     }
 }
 
-pub fn pathbuf_to_string(p: PathBuf) -> String {
-    p.into_os_string().into_string().unwrap()
-}
+// pub fn pathbuf_to_string(p: PathBuf) -> String {
+//     p.into_os_string().into_string().unwrap()
+// }
 
-pub fn pathbuf_ref_to_string(p: &PathBuf) -> String {
-    p.clone().into_os_string().into_string().unwrap()
-}
+// pub fn pathbuf_ref_to_string(p: &PathBuf) -> String {
+//     p.clone().into_os_string().into_string().unwrap()
+// }
