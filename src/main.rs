@@ -1,53 +1,28 @@
-use colored::ColoredString;
-mod input;
-use input::*;
 mod format;
+mod input;
 use format::*;
 use std::env;
-use std::fs;
-use std::path::PathBuf;
 mod paths;
 use crate::paths::*;
+mod config;
+use crate::config::*;
 
-/// Returns the direct children of a specified [`FilePath`]
-fn get_children(path: &FilePath) -> Vec<FilePath> {
-    let dir_iterator = match fs::read_dir(path.to_string()) {
-        Ok(itr) => itr,
-        Err(e) => panic!(
-            "Could not read path: {:?} due to error: {:?}",
-            &path.to_string(),
-            e
-        ),
-    };
-    // Init empty Vec to hold children
-    let mut children: Vec<FilePath> = Vec::new();
-
-    for result in dir_iterator {
-        let p = result.expect("DirEntry error").path();
-        children.push(FilePath::new(p));
+fn print_children(path: &FilePath, depth: usize, config: &Config) {
+    let tab_size: usize = config.tab_size;
+    let max_depth: usize = config.max_depth;
+    if depth > max_depth {
+        println!(
+            "{}",
+            format_spacing_cstr(
+                format_info("<Max depth reached>".to_string()),
+                depth,
+                tab_size
+            )
+        );
+        return;
     }
-    children
-}
-
-// sexy recursion TODO: unused
-fn get_descendant_count(path: FilePath, file_count_warning_cutoff: usize) -> usize {
-    let mut total_child_count: usize = 0;
-    let children = get_children(&path);
-    total_child_count += children.len();
-    for child in children {
-        total_child_count += get_descendant_count(child, file_count_warning_cutoff);
-        if total_child_count > file_count_warning_cutoff {
-            return total_child_count;
-        }
-    }
-    total_child_count
-}
-
-fn print_children(path: FilePath, depth: usize) {
-    let space_count: usize = 4;
-    let max_depth: usize = 5;
-    let max_subfiles_to_print: usize = 3;
-    let children_itr = get_children(&path).into_iter();
+    let max_subfiles_to_print: usize = config.max_subfiles;
+    let children_itr = path.get_children().into_iter();
     let files: Vec<FilePath> = children_itr.clone().filter(|x| x.is_file()).collect();
     let folders: Vec<FilePath> = children_itr.filter(|x| x.is_directory()).collect();
     // needs to handle 3 cases:
@@ -59,80 +34,36 @@ fn print_children(path: FilePath, depth: usize) {
     for subfolder in folders {
         // Print name of the folder
         println!(
-            "{:?}",
-            format_dir(buffer_spaces_str(
-                subfolder.get_item_name().as_str(),
-                depth,
-                space_count
-            ))
+            "{}",
+            format_spacing_cstr(format_dir(subfolder.get_item_name()), depth, tab_size)
         );
         // Followed by it's children
-        print_children(subfolder, depth + 1);
+        print_children(&subfolder, depth + 1, config);
     }
+
     // followed by subfiles
-    let mut printed_file_count: usize = 0;
-    for subfile in files {
-        println!("{:?}", subfile.get_item_name());
-        printed_file_count += 1;
-        if printed_file_count > max_subfiles_to_print {
-            println!(
-                "{}",
-                format_notify(buffer_spaces_str(
-                    "<Max depth reached>",
-                    depth + 1,
-                    space_count
-                ))
-            );
+    for x in 0..max_subfiles_to_print {
+        if x == files.len() {
             break;
         }
+        let subfile = &files[x];
+        println!(
+            "{}",
+            format_spaces_str(subfile.get_item_name().as_str(), depth, tab_size)
+        );
     }
-
-    // for child in children_itr.clone() {
-    // println!(
-    //     "{}",
-    //     buffer_spaces_string(child.get_item_name(), level, space_count)
-    //         .bold()
-    //         .blue()
-    // );
-    // if child.is_empty_dir() {
-    //     println!(
-    //         "{}",
-    //         format_notify(buffer_spaces_str("<Empty dir>", level + 1, space_count))
-    //     );
-    // } else {
-    //     if level < max_depth {
-    //         print_children(child, level + 1);
-    //     } else {
-    //         println!(
-    //             "{}",
-    //             format_notify(buffer_spaces_str(
-    //                 "<Max depth reached>",
-    //                 level + 1,
-    //                 space_count
-    //             ))
-    //         );
-    //     }
-    // }
-    // }
-
-    // let mut printed_file_count: usize = 0;
-    // let strings = children_itr.map(|fp| fp.to_string().as_str()).collect();
-    // let strings_to_be_printed: Vec<String> = buffer_spaces_vec(strings, level, space_count);
-    // let string_count = strings_to_be_printed.len();
-    // for line in strings_to_be_printed {
-    //     println!("{}", line);
-    //     printed_file_count += 1;
-    //     if printed_file_count > max_subfiles_to_print {
-    //         let remaining_files_count: usize = string_count - printed_file_count;
-    //         let s: String = buffer_spaces_str(
-    //             format!("<{} more files>", remaining_files_count).as_str(),
-    //             level,
-    //             space_count,
-    //         );
-    //         println!("{}", format_notify(s));
-    //         break;
-    //     }
-    // }
+    // if we skipped some, then say so here
+    if max_subfiles_to_print < path.get_immediate_child_file_count() {
+        let unprinted_file_count = path.get_immediate_child_file_count() - max_subfiles_to_print;
+        println!(
+            "{}",
+            format_spacing_cstr(
+                format_info(format!("<{} more files>", unprinted_file_count)),
+                depth + 1,
+                tab_size
+            )
+        );
+    }
 }
 
 fn handle_args(args: Vec<String>) -> Vec<FilePath> {
@@ -142,7 +73,7 @@ fn handle_args(args: Vec<String>) -> Vec<FilePath> {
     let mut paths_to_search: Vec<FilePath> = Vec::new();
 
     // if there are args given by the user,
-    if args.len() > 1 {
+    if args.len() > 0 {
         for arg in args {
             // copy path from the cmd line arguments
             let path_ext = handle_path(arg);
@@ -158,34 +89,44 @@ fn handle_args(args: Vec<String>) -> Vec<FilePath> {
     paths_to_search
 }
 
-fn check_found_file_count(max_count: usize) {}
+fn check_found_file_count(path: &FilePath, max_count: usize) -> bool {
+    let continue_by_default = true;
+    let descendant_count = path.get_descendant_count();
+
+    if descendant_count > max_count {
+        let prompt = format!("Warning: {} items - continue?", descendant_count);
+        if input::bool_input(&prompt, continue_by_default) {
+            // keep going :)
+            return false;
+        } else {
+            // dont keep going :(
+            return true;
+        }
+    }
+    return false;
+}
 
 fn main() {
     // collect cmd line args
-    let args: Vec<String> = env::args().collect();
+    let args: Vec<String> = env::args().collect::<Vec<String>>()[1..].to_vec();
 
     let paths_to_search = handle_args(args);
-
-    // unused file count warning
-    // TODO: fix this
-    // let file_count_warning_cutoff: usize = 10;
-    // if get_descendant_count(get_cwd(), file_count_warning_cutoff) > file_count_warning_cutoff {
-    //     let prompt = String::from("Warning: greater than ")
-    //         + file_count_warning_cutoff.to_string().as_str()
-    //         + " files - continue?";
-    //     let default = false;
-    //     if input::bool_input(prompt, default) {
-    //         // keep going :)
-    //     } else {
-    //         return;
-    //     }
-    // }
+    let config = Config {
+        show_hidden_files: false,
+        file_count_warning_cutoff: 50,
+        tab_size: 4,
+        max_depth: 6,
+        max_subfiles: 10,
+    };
 
     // search each path
     for path in paths_to_search {
-        let message: String = format!("Searching 👉👉 {}", path.to_string());
+        if check_found_file_count(&path, config.file_count_warning_cutoff) {
+            println!("bye 🖐");
+            continue;
+        }
+        let message: String = format!("Searching 👉 {}", &path.to_string());
         println!("{}", format_title(message));
-        println!("Is absolute: {}", path.is_absolute());
-        // print_children(path, 0);
+        print_children(&path, 0, &config);
     }
 }

@@ -1,16 +1,23 @@
 use dirs_next;
+use std::fs::{self};
+use std::process::exit;
 use std::{env, path::PathBuf};
 
-use crate::get_children;
-
 // Auto-implement clone for type FilePathh
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct FilePath {
     location: PathBuf,
 }
 
 impl FilePath {
-    pub fn new(location: PathBuf) -> FilePath {
+    /// Create new [`FilePath`] with default [`PathBuf`] location
+    pub fn new() -> FilePath {
+        let location = PathBuf::new();
+        FilePath { location }
+    }
+
+    /// Create new [`FilePath`] from provided [`PathBuf`] location
+    pub fn from(location: PathBuf) -> FilePath {
         FilePath { location }
     }
 
@@ -24,14 +31,19 @@ impl FilePath {
         for part in parts {
             path.push(part);
         }
-        FilePath::new(path)
+        FilePath::from(path)
+    }
+
+    /// Convert a [`str`] to a [`FilePath`] object.
+    pub fn from_str(s: &str) -> FilePath {
+        FilePath::from_string(s.to_owned())
     }
 
     /// Returns a [`PathBuf`] to the user's home directory
     pub fn get_home_path() -> FilePath {
         let home_path = dirs_next::home_dir();
         match home_path {
-            Some(p) => FilePath::new(p),
+            Some(p) => FilePath::from(p),
             None => panic!(
             "Problem getting user's home directory. Try running without the use of '~' in the path"
         ),
@@ -40,20 +52,22 @@ impl FilePath {
 
     pub fn get_cwd_path() -> FilePath {
         match env::current_dir() {
-            Ok(p) => FilePath::new(p),
+            Ok(p) => FilePath::from(p),
             Err(e) => panic!("Error finding the current working path: {:?}", e),
         }
     }
 
     pub fn append(&self, other: FilePath) -> FilePath {
         // appends p2 to p1
-        FilePath::new(self.location.join(other.location))
+        FilePath::from(self.location.join(other.location))
     }
 
     pub fn get_item_name(&self) -> String {
         let self_string = self.to_string();
-        let x: Vec<&str> = self_string.split("/").collect();
-        x.get(x.len() - 1).expect("error msg").to_string()
+        let x: Vec<&str> = self_string.split(get_slash_type(&self_string)).collect();
+        let s = x.get(x.len() - 1).expect("error msg").to_string();
+        // println!("The item name: '{}'", s);
+        s
     }
 
     pub fn is_file(&self) -> bool {
@@ -65,11 +79,78 @@ impl FilePath {
     }
 
     pub fn is_empty_dir(&self) -> bool {
-        self.is_directory() && get_children(self).len().eq(&0)
+        self.is_directory() && self.get_children().len().eq(&0)
     }
 
     pub fn is_absolute(&self) -> bool {
         self.location.is_absolute()
+    }
+
+    /// Returns the direct children of a specified [`FilePath`]
+    pub fn get_children(&self) -> Vec<FilePath> {
+        let dir_iterator = match fs::read_dir(self.to_string()) {
+            Ok(itr) => itr,
+            Err(e) => match e.kind() {
+                std::io::ErrorKind::PermissionDenied => {
+                    println!("Permission denied: cannot access {}", self.to_string());
+                    exit(1);
+                }
+                std::io::ErrorKind::NotFound => {
+                    println!("Path not found: cannot access {}", self.to_string());
+                    exit(1);
+                }
+
+                _ => panic!(
+                    "Could not read path: {:?} due to error: {:?}",
+                    self.to_string(),
+                    e
+                ),
+            },
+        };
+        // Init empty Vec to hold children
+        let mut children: Vec<FilePath> = Vec::new();
+
+        for result in dir_iterator {
+            let p = result.expect("DirEntry error").path();
+            children.push(FilePath::from(p));
+        }
+        children
+    }
+
+    pub fn get_child_folders(&self) -> Vec<FilePath> {
+        self.get_children()
+            .into_iter()
+            .filter(|x| x.is_directory())
+            .collect()
+    }
+
+    pub fn get_child_files(&self) -> Vec<FilePath> {
+        let x = self
+            .get_children()
+            .into_iter()
+            .filter(|x| x.is_file())
+            .collect();
+        // println!("children of {:?}: {:?}", self.to_string(), x);
+        x
+    }
+
+    pub fn get_child_count(&self) -> usize {
+        self.get_children().len()
+    }
+
+    pub fn get_immediate_child_file_count(&self) -> usize {
+        let x = self.get_child_files().len();
+        // println!("{} has {} children", self.to_string(), x);
+        x
+    }
+
+    pub fn get_descendant_count(&self) -> usize {
+        let mut total_desc_count: usize = 0;
+        total_desc_count += self.get_child_count();
+        for subfolder in self.get_child_folders() {
+            total_desc_count += subfolder.get_descendant_count();
+        }
+        total_desc_count
     }
 }
 
@@ -82,55 +163,46 @@ impl ToString for FilePath {
     }
 }
 
-// impl Deref for FilePath {
-//     type Target = FilePath;
-//     fn deref(&self) -> &Self::Target {
-//         &self
-//     }
-// }
-
 pub fn handle_path(path_str: String) -> FilePath {
-    // TODO: fix support usage of . and ~
-    // using https://lib.rs/install/dirs-next
-
-    // let chars = path_str.chars();
-
-    let no_prefix = path_str[1..].to_owned().strip_prefix("/").unwrap();
-    if path_str.starts_with("~") {
-        // then replace '~' with home dir
-        let path: FilePath = FilePath::from_string(no_prefix.to_owned());
-        return FilePath::get_home_path().append(path);
-    } else if path_str.starts_with("./") {
-        let path: FilePath = FilePath::from_string(no_prefix.to_owned());
-        return FilePath::get_cwd_path().append(path);
-    } else {
-        // no special stuff
+    let is_absolute = path_str.starts_with("/"); // || path_str.starts_with();
+    if is_absolute {
         return FilePath::from_string(path_str);
     }
+
+    // start with the current directory
+    let mut fp = FilePath::get_cwd_path().location;
+    let parts: Vec<&str> = path_str.split("/").collect();
+    for part in parts {
+        // println!("{}", part);
+
+        match part {
+            "~" => {
+                fp = FilePath::get_home_path().location;
+            }
+            ".." => {
+                fp.pop();
+            }
+            "." => {}
+            _x => fp.push(_x), // wildcard
+        }
+    }
+    FilePath::from(fp)
 }
 
-pub fn enforce_leading_slash(mut path_str: String) -> String {
+fn enforce_leading_slash(mut path_str: String) -> String {
     if path_str.len() == 0 {
         return "/".to_owned();
     }
     if path_str.as_bytes()[0] != b'/' {
-        path_str.insert(0, find_slash_type(&path_str));
+        path_str.insert(0, get_slash_type(&path_str));
     }
     path_str
 }
 
-fn find_slash_type(s: &str) -> char {
+fn get_slash_type(s: &str) -> char {
     if s.contains('\\') {
         '\\'
     } else {
         '/'
     }
 }
-
-// pub fn pathbuf_to_string(p: PathBuf) -> String {
-//     p.into_os_string().into_string().unwrap()
-// }
-
-// pub fn pathbuf_ref_to_string(p: &PathBuf) -> String {
-//     p.clone().into_os_string().into_string().unwrap()
-// }

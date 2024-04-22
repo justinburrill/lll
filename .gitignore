@@ -18,3 +18,5 @@ __pycache__/
 *.spec
 dist/
 build/
+
+test/

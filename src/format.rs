@@ -1,8 +1,14 @@
 use colored::ColoredString;
 use colored::Colorize;
 
-pub fn format_notify(s: String) -> ColoredString {
-    s.italic().bold().dimmed()
+pub fn format_info(s: String) -> ColoredString {
+    let grey = 100;
+    s.custom_color(colored::CustomColor {
+        r: (grey),
+        g: (grey),
+        b: (grey),
+    })
+    .italic()
 }
 
 pub fn format_title(s: String) -> ColoredString {
@@ -10,20 +16,34 @@ pub fn format_title(s: String) -> ColoredString {
 }
 
 pub fn format_dir(s: String) -> ColoredString {
-    s.bold().blue()
+    (s + "/").bold().blue()
 }
 
-/// Adds a number of spaces to the start of a [`String`]
-pub fn buffer_spaces_str(str: &str, level: usize, space_count: usize) -> String {
-    " ".repeat(level * space_count) + str
+/// Adds a number of spaces to the start of a [`str`]
+pub fn format_spaces_str(str: &str, depth: usize, tab_size: usize) -> String {
+    generate_spacing('|', '-', tab_size, depth) + str
 }
 
-/// Adds spaces to a vector of [`String`] objects.
-fn buffer_spaces_vec(strings: Vec<&str>, level: usize, space_count: usize) -> Vec<String> {
-    let mut strings2: Vec<String> = Vec::new();
-    for str in strings {
-        strings2.push(buffer_spaces_str(str, level, space_count));
-        // println!("{} spaces added to {}", level * space_count, str.clone());
-    }
-    strings2
+pub fn format_spacing_cstr(str: ColoredString, depth: usize, tab_size: usize) -> String {
+    let first_char = '|';
+    let fill_char = '-';
+    format!(
+        "{}{}",
+        ColoredString::from(generate_spacing(first_char, fill_char, tab_size, depth)),
+        str,
+    )
 }
+
+fn generate_spacing(first_char: char, fill_char: char, tab_size: usize, depth: usize) -> String {
+    String::from(first_char.to_string() + &fill_char.to_string().repeat(tab_size - 1)).repeat(depth)
+}
+
+// /// Adds spaces to a vector of [`String`] objects.
+// fn buffer_spaces_vec(strings: Vec<&str>, depth: usize, tab_size: usize) -> Vec<String> {
+//     let mut strings2: Vec<String> = Vec::new();
+//     for str in strings {
+//         strings2.push(buffer_spaces_str(str, depth, tab_size));
+//         // println!("{} spaces added to {}", level * space_count, str.clone());
+//     }
+//     strings2
+// }
