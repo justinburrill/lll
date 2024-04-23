@@ -65,8 +65,7 @@ impl FilePath {
     pub fn get_item_name(&self) -> String {
         let self_string = self.to_string();
         let x: Vec<&str> = self_string.split(get_slash_type(&self_string)).collect();
-        let s = x.get(x.len() - 1).expect("error msg").to_string();
-        // println!("The item name: '{}'", s);
+        let s = x.get(x.len() - 1).unwrap().to_string();
         s
     }
 

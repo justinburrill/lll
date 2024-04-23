@@ -22,6 +22,8 @@ fn print_children(path: &FilePath, depth: usize, config: &Config) {
         return;
     }
     let max_subfiles_to_print: usize = config.max_subfiles;
+
+    // TODO: this performance is probably horrible
     let children_itr = path.get_children().into_iter();
     let files: Vec<FilePath> = children_itr.clone().filter(|x| x.is_file()).collect();
     let folders: Vec<FilePath> = children_itr.filter(|x| x.is_directory()).collect();
@@ -59,7 +61,7 @@ fn print_children(path: &FilePath, depth: usize, config: &Config) {
             "{}",
             format_spacing_cstr(
                 format_info(format!("<{} more files>", unprinted_file_count)),
-                depth + 1,
+                depth,
                 tab_size
             )
         );
