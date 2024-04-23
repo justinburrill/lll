@@ -2,12 +2,16 @@ mod format;
 mod input;
 use format::*;
 use std::env;
+use std::io;
+use std::time::Instant;
 mod paths;
 use crate::paths::*;
 mod config;
 use crate::config::*;
+use std::time;
 
-fn print_children(path: &FilePath, depth: usize, config: &Config) {
+// Turn this into a wrapper function for a find_children or something? ?? i'm not happy with the way i handle the errors here
+fn print_children(path: &FilePath, depth: usize, config: &Config) -> io::Result<()> {
     let tab_size: usize = config.tab_size;
     let max_depth: usize = config.max_depth;
     if depth > max_depth {
@@ -19,12 +23,12 @@ fn print_children(path: &FilePath, depth: usize, config: &Config) {
                 tab_size
             )
         );
-        return;
+        return Ok(());
     }
     let max_subfiles_to_print: usize = config.max_subfiles;
 
     // TODO: this performance is probably horrible
-    let children_itr = path.get_children().into_iter();
+    let children_itr = path.get_children().unwrap().into_iter();
     let files: Vec<FilePath> = children_itr.clone().filter(|x| x.is_file()).collect();
     let folders: Vec<FilePath> = children_itr.filter(|x| x.is_directory()).collect();
     // needs to handle 3 cases:
@@ -66,6 +70,7 @@ fn print_children(path: &FilePath, depth: usize, config: &Config) {
             )
         );
     }
+    Ok(())
 }
 
 fn handle_args(args: Vec<String>) -> Vec<FilePath> {
@@ -129,6 +134,9 @@ fn main() {
         }
         let message: String = format!("Searching 👉 {}", &path.to_string());
         println!("{}", format_title(message));
-        print_children(&path, 0, &config);
+        let start = Instant::now();
+        let _ = print_children(&path, 0, &config);
+        let duration = start.elapsed();
+        println!("{}", format_info(format!("completed in {:?}", duration)));
     }
 }

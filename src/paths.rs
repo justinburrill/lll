@@ -1,6 +1,6 @@
 use dirs_next;
 use std::fs::{self};
-use std::process::exit;
+use std::io;
 use std::{env, path::PathBuf};
 
 // Auto-implement clone for type FilePathh
@@ -78,7 +78,7 @@ impl FilePath {
     }
 
     pub fn is_empty_dir(&self) -> bool {
-        self.is_directory() && self.get_children().len().eq(&0)
+        self.is_directory() && self.get_children().unwrap().len().eq(&0)
     }
 
     pub fn is_absolute(&self) -> bool {
@@ -86,38 +86,43 @@ impl FilePath {
     }
 
     /// Returns the direct children of a specified [`FilePath`]
-    pub fn get_children(&self) -> Vec<FilePath> {
-        let dir_iterator = match fs::read_dir(self.to_string()) {
-            Ok(itr) => itr,
-            Err(e) => match e.kind() {
-                std::io::ErrorKind::PermissionDenied => {
-                    println!("Permission denied: cannot access {}", self.to_string());
-                    exit(1);
-                }
-                std::io::ErrorKind::NotFound => {
-                    println!("Path not found: cannot access {}", self.to_string());
-                    exit(1);
-                }
+    pub fn get_children(&self) -> io::Result<Vec<FilePath>> {
+        // Use only iterators instead of vectors?
 
-                _ => panic!(
-                    "Could not read path: {:?} due to error: {:?}",
-                    self.to_string(),
-                    e
-                ),
-            },
-        };
+        // let dir_iterator = match fs::read_dir(self.to_string()) {
+        //     Ok(itr) => itr,
+        //     Err(e) => match e.kind() {
+        //         std::io::ErrorKind::PermissionDenied => {
+        //             println!("Permission denied: cannot access {}", self.to_string());
+        //             exit(1);
+        //         }
+        //         std::io::ErrorKind::NotFound => {
+        //             println!("Path not found: cannot access {}", self.to_string());
+        //             exit(1);
+        //         }
+
+        //         _ => panic!(
+        //             "Could not read path: {:?} due to error: {:?}",
+        //             self.to_string(),
+        //             e
+        //         ),
+        //     },
+        // };
+
+        let dir_iterator = fs::read_dir(self.to_string())?;
         // Init empty Vec to hold children
         let mut children: Vec<FilePath> = Vec::new();
 
         for result in dir_iterator {
-            let p = result.expect("DirEntry error").path();
+            let p = result.expect("Error getting PathBuf from DirEntry").path();
             children.push(FilePath::from(p));
         }
-        children
+        Ok(children)
     }
 
     pub fn get_child_folders(&self) -> Vec<FilePath> {
         self.get_children()
+            .unwrap()
             .into_iter()
             .filter(|x| x.is_directory())
             .collect()
@@ -126,6 +131,7 @@ impl FilePath {
     pub fn get_child_files(&self) -> Vec<FilePath> {
         let x = self
             .get_children()
+            .unwrap()
             .into_iter()
             .filter(|x| x.is_file())
             .collect();
@@ -134,7 +140,7 @@ impl FilePath {
     }
 
     pub fn get_child_count(&self) -> usize {
-        self.get_children().len()
+        self.get_children().unwrap().len()
     }
 
     pub fn get_immediate_child_file_count(&self) -> usize {

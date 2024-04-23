@@ -6,4 +6,4 @@
 - Let the program exit gracefully on encountering permission errors
 - Give performance times after searching
 - Multi-threading
-- Support command line arguments in a better way
+- Support command line arguments for depth and such
