@@ -28,12 +28,7 @@ pub fn text_input(prompt: &str) -> String {
     let mut input_string = String::new();
 
     match io::stdin().read_line(&mut input_string) {
-        Ok(_) => input_string
-            .strip_suffix("\n")
-            .unwrap()
-            .strip_suffix("\r")
-            .unwrap()
-            .to_owned(),
+        Ok(_) => input_string.trim().to_owned(),
         Err(e) => panic!("Problem reading input 😭😭: {:?}", e),
     }
 }
