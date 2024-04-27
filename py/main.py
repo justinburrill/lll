@@ -36,7 +36,7 @@ def print_dir(
 
 
 def main():
-    FILE_COUNT_WARNING = 25
+    FILE_COUNT_WARNING = 100
     DEPTH_LIMIT = 5
 
     working_dir = getcwd()
