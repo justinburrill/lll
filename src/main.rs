@@ -3,6 +3,7 @@ mod input;
 use format::*;
 use std::env;
 use std::io;
+use std::io::ErrorKind;
 use std::time::Instant;
 mod paths;
 use crate::paths::*;
@@ -25,12 +26,14 @@ fn print_children(path: &FilePath, depth: usize, config: &Config) -> io::Result<
         );
         return Ok(());
     }
-    let max_subfiles_to_print: usize = config.max_subfiles;
+    let max_subfiles_to_print: usize = if (depth != 0) {
+        config.max_subfiles
+    } else {
+        path.get_child_file_count()
+    };
 
-    // TODO: this performance is probably horrible
-    let children_itr = path.get_children().unwrap().into_iter();
-    let files: Vec<FilePath> = children_itr.clone().filter(|x| x.is_file()).collect();
-    let folders: Vec<FilePath> = children_itr.filter(|x| x.is_directory()).collect();
+    let files = path.get_child_files()?;
+    let folders = path.get_child_folders()?;
     // needs to handle 3 cases:
     // - is a dir with children
     // - is a dir without children
@@ -43,8 +46,28 @@ fn print_children(path: &FilePath, depth: usize, config: &Config) -> io::Result<
             "{}",
             format_spacing_cstr(format_dir(subfolder.get_item_name()), depth, tab_size)
         );
+        if subfolder.is_empty_dir()? {
+            println!(
+                "{}",
+                format_spacing_cstr(format_info("<Empty dir>".to_owned()), depth + 1, tab_size)
+            )
+        }
         // Followed by it's children
-        print_children(&subfolder, depth + 1, config);
+        else {
+            let s: Option<&str> = match print_children(&subfolder, depth + 1, config) {
+                Ok(()) => None,
+                Err(e) => match e.kind() {
+                    ErrorKind::PermissionDenied => Some("<Permission Error>"),
+                    _ => Some("<Unknown Error>"),
+                },
+            };
+            if s.is_some() {
+                println!(
+                    "{}",
+                    format_spacing_cstr(format_error(s.unwrap().to_owned()), depth + 1, tab_size)
+                )
+            }
+        }
     }
 
     // followed by subfiles
@@ -55,12 +78,12 @@ fn print_children(path: &FilePath, depth: usize, config: &Config) -> io::Result<
         let subfile = &files[x];
         println!(
             "{}",
-            format_spaces_str(subfile.get_item_name().as_str(), depth, tab_size)
+            format_spacing_str(subfile.get_item_name().as_str(), depth, tab_size)
         );
     }
     // if we skipped some, then say so here
-    if max_subfiles_to_print < path.get_immediate_child_file_count() {
-        let unprinted_file_count = path.get_immediate_child_file_count() - max_subfiles_to_print;
+    if max_subfiles_to_print < path.get_child_file_count() {
+        let unprinted_file_count = path.get_child_file_count() - max_subfiles_to_print;
         println!(
             "{}",
             format_spacing_cstr(
@@ -96,12 +119,18 @@ fn handle_args(args: Vec<String>) -> Vec<FilePath> {
     paths_to_search
 }
 
-fn check_found_file_count(path: &FilePath, max_count: usize) -> bool {
-    let continue_by_default = true;
+fn check_found_file_count(path: &FilePath, cfg: &Config) -> bool {
+    let continue_by_default = cfg.continue_on_file_warning_default;
+    let now = Instant::now();
     let descendant_count = path.get_descendant_count();
+    let max_count = cfg.file_count_warning_cutoff;
 
     if descendant_count > max_count {
-        let prompt = format!("Warning: {} items - continue?", descendant_count);
+        let prompt = format!(
+            "Warning: {} items - continue? (counted in {}s)",
+            descendant_count,
+            now.elapsed().as_secs_f32()
+        );
         if input::bool_input(&prompt, continue_by_default) {
             // keep going :)
             return false;
@@ -120,23 +149,27 @@ fn main() {
     let paths_to_search = handle_args(args);
     let config = Config {
         show_hidden_files: false,
+        continue_on_file_warning_default: true,
         file_count_warning_cutoff: 50,
         tab_size: 4,
-        max_depth: 6,
+        max_depth: 5,
         max_subfiles: 10,
     };
 
     // search each path
     for path in paths_to_search {
-        if check_found_file_count(&path, config.file_count_warning_cutoff) {
+        if check_found_file_count(&path, &config) {
             println!("bye 🖐");
             continue;
         }
-        let message: String = format!("Searching 👉 {}", &path.to_string());
+        let message: String = format!("Searching {}", &path.to_string());
         println!("{}", format_title(message));
         let start = Instant::now();
         let _ = print_children(&path, 0, &config);
         let duration = start.elapsed();
-        println!("{}", format_info(format!("completed in {:?}", duration)));
+        println!(
+            "{}",
+            format_info(format!("Search completed in {:?}s", duration.as_secs_f32()))
+        );
     }
 }

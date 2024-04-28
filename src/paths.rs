@@ -1,6 +1,7 @@
 use dirs_next;
-use std::fs::{self};
-use std::io;
+use std::fs::DirEntry;
+use std::fs::{self, ReadDir};
+use std::io::{self, Read};
 use std::{env, path::PathBuf};
 
 // Auto-implement clone for type FilePathh
@@ -77,85 +78,78 @@ impl FilePath {
         self.location.is_dir()
     }
 
-    pub fn is_empty_dir(&self) -> bool {
-        self.is_directory() && self.get_children().unwrap().len().eq(&0)
+    pub fn is_empty_dir(&self) -> io::Result<bool> {
+        Ok(self.is_directory() && self.get_child_count()? == 0)
     }
 
     pub fn is_absolute(&self) -> bool {
         self.location.is_absolute()
     }
 
+    fn dir_entries_to_fp(iter: impl Iterator<Item = io::Result<DirEntry>>) -> Vec<FilePath> {
+        let mut out: Vec<FilePath> = Vec::new();
+        for item in iter {
+            out.push(FilePath::from(
+                item.expect("Error getting DirEntry from iter").path(),
+            ));
+        }
+        out
+    }
+
+    pub fn get_children_iter(&self) -> io::Result<ReadDir> {
+        match fs::read_dir(&self.location) {
+            Ok(dir_iter) => Ok(dir_iter),
+            Err(e) => Err(e),
+        }
+    }
+
     /// Returns the direct children of a specified [`FilePath`]
     pub fn get_children(&self) -> io::Result<Vec<FilePath>> {
-        // Use only iterators instead of vectors?
-
-        // let dir_iterator = match fs::read_dir(self.to_string()) {
-        //     Ok(itr) => itr,
-        //     Err(e) => match e.kind() {
-        //         std::io::ErrorKind::PermissionDenied => {
-        //             println!("Permission denied: cannot access {}", self.to_string());
-        //             exit(1);
-        //         }
-        //         std::io::ErrorKind::NotFound => {
-        //             println!("Path not found: cannot access {}", self.to_string());
-        //             exit(1);
-        //         }
-
-        //         _ => panic!(
-        //             "Could not read path: {:?} due to error: {:?}",
-        //             self.to_string(),
-        //             e
-        //         ),
-        //     },
-        // };
-
-        let dir_iterator = fs::read_dir(self.to_string())?;
         // Init empty Vec to hold children
         let mut children: Vec<FilePath> = Vec::new();
-
-        for result in dir_iterator {
+        for result in self.get_children_iter()? {
             let p = result.expect("Error getting PathBuf from DirEntry").path();
             children.push(FilePath::from(p));
         }
         Ok(children)
     }
 
-    pub fn get_child_folders(&self) -> Vec<FilePath> {
-        self.get_children()
-            .unwrap()
-            .into_iter()
-            .filter(|x| x.is_directory())
-            .collect()
+    pub fn get_child_folders(&self) -> io::Result<Vec<FilePath>> {
+        let iter = self.get_children_iter()?;
+        let is_folder =
+            |x: &io::Result<DirEntry>| x.as_ref().unwrap().file_type().unwrap().is_dir();
+        Ok(FilePath::dir_entries_to_fp(iter.filter(is_folder)))
     }
 
-    pub fn get_child_files(&self) -> Vec<FilePath> {
-        let x = self
-            .get_children()
-            .unwrap()
-            .into_iter()
-            .filter(|x| x.is_file())
-            .collect();
-        // println!("children of {:?}: {:?}", self.to_string(), x);
-        x
+    pub fn get_child_files(&self) -> io::Result<Vec<FilePath>> {
+        Ok(FilePath::dir_entries_to_fp(
+            self.get_children_iter()?
+                .filter(|x: &io::Result<DirEntry>| {
+                    x.as_ref().unwrap().file_type().unwrap().is_file()
+                }),
+        ))
     }
 
-    pub fn get_child_count(&self) -> usize {
-        self.get_children().unwrap().len()
+    pub fn get_child_count(&self) -> io::Result<usize> {
+        // Ok(self.get_children()?.len())
+        Ok(self.get_children_iter()?.count())
     }
 
-    pub fn get_immediate_child_file_count(&self) -> usize {
-        let x = self.get_child_files().len();
+    pub fn get_child_file_count(&self) -> usize {
+        let x = self.get_child_files().unwrap().len();
         // println!("{} has {} children", self.to_string(), x);
         x
     }
 
     pub fn get_descendant_count(&self) -> usize {
         let mut total_desc_count: usize = 0;
-        total_desc_count += self.get_child_count();
-        for subfolder in self.get_child_folders() {
+        let child_count: usize = self.get_child_count().unwrap_or(0);
+        total_desc_count += child_count;
+        // default to 0 kids if there was an error getting the subfolders
+        for subfolder in self.get_child_folders().unwrap_or(Vec::new()) {
             total_desc_count += subfolder.get_descendant_count();
         }
-        total_desc_count
+        return total_desc_count;
     }
 }
 

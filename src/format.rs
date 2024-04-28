@@ -11,6 +11,10 @@ pub fn format_info(s: String) -> ColoredString {
     .italic()
 }
 
+pub fn format_error(s: String) -> ColoredString {
+    s.red()
+}
+
 pub fn format_title(s: String) -> ColoredString {
     s.bold()
 }
@@ -20,7 +24,7 @@ pub fn format_dir(s: String) -> ColoredString {
 }
 
 /// Adds a number of spaces to the start of a [`str`]
-pub fn format_spaces_str(str: &str, depth: usize, tab_size: usize) -> String {
+pub fn format_spacing_str(str: &str, depth: usize, tab_size: usize) -> String {
     generate_spacing('|', '-', tab_size, depth) + str
 }
 
