@@ -1,10 +1,10 @@
 use dirs_next;
 use std::fs::DirEntry;
 use std::fs::{self, ReadDir};
-use std::io::{self, Read};
+use std::io;
 use std::{env, path::PathBuf};
 
-// Auto-implement clone for type FilePathh
+// Auto-implement clone for type FilePath
 #[derive(Debug, Clone)]
 pub struct FilePath {
     location: PathBuf,

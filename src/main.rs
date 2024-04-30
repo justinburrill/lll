@@ -9,7 +9,6 @@ mod paths;
 use crate::paths::*;
 mod config;
 use crate::config::*;
-use std::time;
 
 // Turn this into a wrapper function for a find_children or something? ?? i'm not happy with the way i handle the errors here
 fn print_children(path: &FilePath, depth: usize, config: &Config) -> io::Result<()> {
@@ -26,7 +25,7 @@ fn print_children(path: &FilePath, depth: usize, config: &Config) -> io::Result<
         );
         return Ok(());
     }
-    let max_subfiles_to_print: usize = if (depth != 0) {
+    let max_subfiles_to_print: usize = if depth != 0 {
         config.max_subfiles
     } else {
         path.get_child_file_count()
@@ -126,12 +125,10 @@ fn check_found_file_count(path: &FilePath, cfg: &Config) -> bool {
     let max_count = cfg.file_count_warning_cutoff;
 
     if descendant_count > max_count {
-        let prompt = format!(
-            "Warning: {} items - continue? (counted in {}s)",
-            descendant_count,
-            now.elapsed().as_secs_f32()
-        );
-        if input::bool_input(&prompt, continue_by_default) {
+        let time = now.elapsed().as_secs_f32();
+        let prompt = format!("Warning: {} items - continue?", descendant_count);
+        let time_info = format_info(format!("(counted in {}s)", time.to_string()));
+        if input::bool_input(&format!("{} {}", prompt, time_info), continue_by_default) {
             // keep going :)
             return false;
         } else {
@@ -169,7 +166,7 @@ fn main() {
         let duration = start.elapsed();
         println!(
             "{}",
-            format_info(format!("Search completed in {:?}s", duration.as_secs_f32()))
+            format_info(format!("(completed in {:?}s)", duration.as_secs_f32()))
         );
     }
 }
