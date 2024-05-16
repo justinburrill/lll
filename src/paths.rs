@@ -2,12 +2,19 @@ use dirs_next;
 use std::fs::DirEntry;
 use std::fs::{self, ReadDir};
 use std::io;
+use std::path::Path;
 use std::{env, path::PathBuf};
 
 // Auto-implement clone for type FilePath
 #[derive(Debug, Clone)]
 pub struct FilePath {
     location: PathBuf,
+}
+
+pub struct Directory {
+    pub path: FilePath,
+    pub subdirs: Vec<Directory>,
+    pub children: Vec<FilePath>,
 }
 
 impl FilePath {
@@ -159,6 +166,23 @@ impl ToString for FilePath {
             .to_str()
             .expect("Error converting FilePath to String")
             .to_owned()
+    }
+}
+
+impl Directory {
+    pub fn new() -> Directory {
+        Directory {
+            path: FilePath::new(),
+            subdirs: vec![],
+            children: vec![],
+        }
+    }
+    pub fn from_fp(fp: FilePath) -> Directory {
+        Directory {
+            path: fp,
+            subdirs: vec![],
+            children: vec![],
+        }
     }
 }
 

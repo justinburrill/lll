@@ -1,4 +1,6 @@
+mod find;
 mod format;
+use clap::Parser;
 mod input;
 use format::*;
 use std::env;
@@ -139,19 +141,39 @@ fn check_found_file_count(path: &FilePath, cfg: &Config) -> bool {
     return false;
 }
 
+fn assemble_dir(path: &FilePath, depth: usize, max_depth: usize) -> io::Result<Directory> {
+    let mut subdirs: Vec<Directory> = Vec::new();
+
+    let mut folders: Vec<FilePath> = path.get_child_folders()?;
+
+    for folder in folders {
+        subdirs.push(assemble_dir(&folder, depth + 1, max_depth)?);
+    }
+
+    let mut files: Vec<FilePath> = path.get_child_files()?;
+    Ok(Directory {
+        path: path.clone(),
+        subdirs,
+        children: files,
+    })
+}
+
+fn print_dir(dir: Directory, depth: usize, config: Config) {}
+
 fn main() {
     // collect cmd line args
     let args: Vec<String> = env::args().collect::<Vec<String>>()[1..].to_vec();
-
     let paths_to_search = handle_args(args);
     let config = Config {
         show_hidden_files: false,
         continue_on_file_warning_default: true,
-        file_count_warning_cutoff: 50,
+        file_count_warning_cutoff: 100,
         tab_size: 4,
         max_depth: 5,
         max_subfiles: 10,
     };
+
+    // let config = Config::parse();
 
     // search each path
     for path in paths_to_search {
