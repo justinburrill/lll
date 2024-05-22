@@ -7,8 +7,10 @@ use std::env;
 use std::io;
 use std::io::ErrorKind;
 use std::time::Instant;
-mod paths;
-use crate::paths::*;
+mod filepath;
+use crate::filepath::*;
+mod directory;
+use crate::directory::*;
 mod config;
 use crate::config::*;
 
@@ -30,7 +32,9 @@ fn print_children(path: &FilePath, depth: usize, config: &Config) -> io::Result<
     let max_subfiles_to_print: usize = if depth != 0 {
         config.max_subfiles
     } else {
-        path.get_child_file_count()
+        let x = path.get_child_file_count();
+        println!("children of {}: {}", path.to_string(),x);
+        x
     };
 
     let files = path.get_child_files()?;
@@ -58,7 +62,9 @@ fn print_children(path: &FilePath, depth: usize, config: &Config) -> io::Result<
             let s: Option<&str> = match print_children(&subfolder, depth + 1, config) {
                 Ok(()) => None,
                 Err(e) => match e.kind() {
-                    ErrorKind::PermissionDenied => Some("<Permission Error>"),
+                    ErrorKind::PermissionDenied => {
+                        println!("permission denied");
+                        Some("<Permission Error>")},
                     _ => Some("<Unknown Error>"),
                 },
             };
@@ -143,18 +149,16 @@ fn check_found_file_count(path: &FilePath, cfg: &Config) -> bool {
 
 fn assemble_dir(path: &FilePath, depth: usize, max_depth: usize) -> io::Result<Directory> {
     let mut subdirs: Vec<Directory> = Vec::new();
-
-    let mut folders: Vec<FilePath> = path.get_child_folders()?;
-
+    let folders: Vec<FilePath> = path.get_child_folders()?;
     for folder in folders {
         subdirs.push(assemble_dir(&folder, depth + 1, max_depth)?);
     }
 
-    let mut files: Vec<FilePath> = path.get_child_files()?;
+    let files: Vec<FilePath> = path.get_child_files()?;
     Ok(Directory {
         path: path.clone(),
         subdirs,
-        children: files,
+        subfiles: files,
     })
 }
 
@@ -170,17 +174,24 @@ fn main() {
         file_count_warning_cutoff: 100,
         tab_size: 4,
         max_depth: 5,
-        max_subfiles: 10,
+        max_subfiles: 5,
     };
 
     // let config = Config::parse();
 
     // search each path
     for path in paths_to_search {
+        // debug ------------
+        let d = Directory::from_fp(path);
+        println!("{:?}", d.to_string());
+
+        continue;
+        // debug ------------
         if check_found_file_count(&path, &config) {
-            println!("bye 🖐");
+            println!();
             continue;
         }
+
         let message: String = format!("Searching {}", &path.to_string());
         println!("{}", format_title(message));
         let start = Instant::now();

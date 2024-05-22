@@ -11,11 +11,6 @@ pub struct FilePath {
     location: PathBuf,
 }
 
-pub struct Directory {
-    pub path: FilePath,
-    pub subdirs: Vec<Directory>,
-    pub children: Vec<FilePath>,
-}
 
 impl FilePath {
     /// Create new [`FilePath`] with default [`PathBuf`] location
@@ -169,22 +164,6 @@ impl ToString for FilePath {
     }
 }
 
-impl Directory {
-    pub fn new() -> Directory {
-        Directory {
-            path: FilePath::new(),
-            subdirs: vec![],
-            children: vec![],
-        }
-    }
-    pub fn from_fp(fp: FilePath) -> Directory {
-        Directory {
-            path: fp,
-            subdirs: vec![],
-            children: vec![],
-        }
-    }
-}
 
 pub fn handle_path(path_str: String) -> FilePath {
     let is_absolute = path_str.starts_with("/"); // || path_str.starts_with();
