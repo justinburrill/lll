@@ -1,21 +1,21 @@
+mod config;
 mod find;
 mod format;
-use clap::Parser;
 mod input;
+use crate::config::*;
+mod pathj;
+use crate::pathj::path::*;
+use crate::pathj::{directory::*, file::*};
 use format::*;
 use std::env;
+use std::ffi::OsString;
 use std::io;
 use std::io::ErrorKind;
+use std::path::PathBuf;
 use std::time::Instant;
-mod filepath;
-use crate::filepath::*;
-mod directory;
-use crate::directory::*;
-mod config;
-use crate::config::*;
 
 // Turn this into a wrapper function for a find_children or something? ?? i'm not happy with the way i handle the errors here
-fn print_children(path: &FilePath, depth: usize, config: &Config) -> io::Result<()> {
+fn print_children(dir: &Directory, depth: usize, config: &Config) -> io::Result<()> {
     let tab_size: usize = config.tab_size;
     let max_depth: usize = config.max_depth;
     if depth > max_depth {
@@ -32,13 +32,13 @@ fn print_children(path: &FilePath, depth: usize, config: &Config) -> io::Result<
     let max_subfiles_to_print: usize = if depth != 0 {
         config.max_subfiles
     } else {
-        let x = path.get_child_file_count();
-        println!("children of {}: {}", path.to_string(),x);
+        let x = dir.get_child_file_count();
+        println!("children of {}: {}", dir.to_string(), x);
         x
     };
 
-    let files = path.get_child_files()?;
-    let folders = path.get_child_folders()?;
+    let files = dir.subfiles.clone();
+    let folders = dir.subdirs.clone();
     // needs to handle 3 cases:
     // - is a dir with children
     // - is a dir without children
@@ -51,7 +51,7 @@ fn print_children(path: &FilePath, depth: usize, config: &Config) -> io::Result<
             "{}",
             format_spacing_cstr(format_dir(subfolder.get_item_name()), depth, tab_size)
         );
-        if subfolder.is_empty_dir()? {
+        if subfolder.is_empty() {
             println!(
                 "{}",
                 format_spacing_cstr(format_info("<Empty dir>".to_owned()), depth + 1, tab_size)
@@ -64,7 +64,8 @@ fn print_children(path: &FilePath, depth: usize, config: &Config) -> io::Result<
                 Err(e) => match e.kind() {
                     ErrorKind::PermissionDenied => {
                         println!("permission denied");
-                        Some("<Permission Error>")},
+                        Some("<Permission Error>")
+                    }
                     _ => Some("<Unknown Error>"),
                 },
             };
@@ -89,8 +90,8 @@ fn print_children(path: &FilePath, depth: usize, config: &Config) -> io::Result<
         );
     }
     // if we skipped some, then say so here
-    if max_subfiles_to_print < path.get_child_file_count() {
-        let unprinted_file_count = path.get_child_file_count() - max_subfiles_to_print;
+    if max_subfiles_to_print < dir.get_child_file_count() {
+        let unprinted_file_count = dir.get_child_file_count() - max_subfiles_to_print;
         println!(
             "{}",
             format_spacing_cstr(
@@ -103,21 +104,23 @@ fn print_children(path: &FilePath, depth: usize, config: &Config) -> io::Result<
     Ok(())
 }
 
-fn handle_args(args: Vec<String>) -> Vec<FilePath> {
-    let current_working_directory: FilePath = FilePath::get_cwd_path();
+fn handle_args(args: Vec<String>) -> Vec<PathBuf> {
+    let current_working_directory: PathBuf = pathj::utils::get_cwd_path();
 
     // vector to hold the paths to be searched
-    let mut paths_to_search: Vec<FilePath> = Vec::new();
+    let mut paths_to_search: Vec<PathBuf> = Vec::new();
 
     // if there are args given by the user,
     if args.len() > 0 {
         for arg in args {
             // copy path from the cmd line arguments
-            let path_ext = handle_path(arg);
+            let path_ext = string_to_path(arg);
             // replace back slashes from user inputwith forward slashes
             //path_ext = path_ext.replace("\\", "/");
             // push the modified path ending to the cwd
-            paths_to_search.push(current_working_directory.append(path_ext))
+            let mut path: OsString = current_working_directory.clone().into_os_string();
+            path.push(path_ext.into_os_string());
+            paths_to_search.push(PathBuf::from(path));
         }
     } else {
         paths_to_search.push(current_working_directory);
@@ -126,7 +129,7 @@ fn handle_args(args: Vec<String>) -> Vec<FilePath> {
     paths_to_search
 }
 
-fn check_found_file_count(path: &FilePath, cfg: &Config) -> bool {
+fn check_found_file_count(path: &Directory, cfg: &Config) -> bool {
     let continue_by_default = cfg.continue_on_file_warning_default;
     let now = Instant::now();
     let descendant_count = path.get_descendant_count();
@@ -147,20 +150,19 @@ fn check_found_file_count(path: &FilePath, cfg: &Config) -> bool {
     return false;
 }
 
-fn assemble_dir(path: &FilePath, depth: usize, max_depth: usize) -> io::Result<Directory> {
-    let mut subdirs: Vec<Directory> = Vec::new();
-    let folders: Vec<FilePath> = path.get_child_folders()?;
-    for folder in folders {
-        subdirs.push(assemble_dir(&folder, depth + 1, max_depth)?);
-    }
-
-    let files: Vec<FilePath> = path.get_child_files()?;
-    Ok(Directory {
-        path: path.clone(),
-        subdirs,
-        subfiles: files,
-    })
-}
+// fn assemble_dir(path: PathBuf, depth: usize, max_depth: usize) -> io::Result<Directory> {
+//     let mut subdirs: Vec<Directory> = Vec::new();
+//     let folders: Vec<Directory> = path.subdirs;
+//     for folder in folders {
+//         subdirs.push(assemble_dir(&folder, depth + 1, max_depth)?);
+//     }
+//     let files: Vec<File> = path.subfiles;
+//     Ok(Directory {
+//         path: path.clone(),
+//         subdirs,
+//         subfiles: files,
+//     })
+// }
 
 fn print_dir(dir: Directory, depth: usize, config: Config) {}
 
@@ -182,24 +184,39 @@ fn main() {
     // search each path
     for path in paths_to_search {
         // debug ------------
-        let d = Directory::from_fp(path);
+        let d = Directory::from_pathbuf(&path);
         println!("{:?}", d.to_string());
 
         continue;
         // debug ------------
-        if check_found_file_count(&path, &config) {
+        if check_found_file_count(&d, &config) {
             println!();
             continue;
         }
 
-        let message: String = format!("Searching {}", &path.to_string());
+        let message: String = format!("Searching {}", &path.display());
         println!("{}", format_title(message));
         let start = Instant::now();
-        let _ = print_children(&path, 0, &config);
+        let _ = print_children(&d, 0, &config);
         let duration = start.elapsed();
         println!(
             "{}",
             format_info(format!("(completed in {:?}s)", duration.as_secs_f32()))
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use crate::pathj::directory;
+
+    #[test]
+    fn count_descendants() {
+        let path = PathBuf::from(r"C:\src\lll\test1");
+        let directory = directory::Directory::from_pathbuf(&path);
+        println!("{:?}", path);
+        assert_eq!(directory.get_descendant_count(), 11);
     }
 }

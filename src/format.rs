@@ -51,3 +51,13 @@ fn generate_spacing(first_char: char, fill_char: char, tab_size: usize, depth: u
 //     }
 //     strings2
 // }
+
+pub fn find_indices_of_char(str: &str, ch: char) -> Vec<usize> {
+    let mut indices: Vec<usize> = vec![];
+    for (i, c) in str.chars().enumerate() {
+        if c == ch {
+            indices.push(i);
+        }
+    }
+    indices
+}
