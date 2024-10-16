@@ -10,3 +10,4 @@
 - Multi-threading
 - Support command line arguments for depth and such
 - add previews of text files
+- show file count while counting

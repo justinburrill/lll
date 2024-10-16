@@ -1,6 +1,7 @@
 use crate::format;
 use crate::pathj::file::*;
 use crate::pathj::path::*;
+use std::fs;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
@@ -80,6 +81,7 @@ impl Directory {
     }
 
     fn assemble_child_files(p: &PathBuf) -> Vec<File> {
+        let x = fs::read_dir(p).unwrap();
         todo!()
     }
 
