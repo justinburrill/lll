@@ -11,3 +11,5 @@
 - Support command line arguments for depth and such
 - add previews of text files
 - show file count while counting
+
+- add compact mode that just shows file count so it's easier to understand the file structure
