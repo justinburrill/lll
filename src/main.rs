@@ -14,7 +14,7 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 // Turn this into a wrapper function for a find_children or something? ?? i'm not happy with the way i handle the errors here
-fn print_children(dir: &Path, depth: usize, config: &Config) -> io::Result<()> {
+fn print_children(dir: &mut Path, depth: usize, config: &Config) -> io::Result<()> {
     let tab_size: usize = config.tab_size;
     let max_depth: usize = config.max_depth;
     if depth > max_depth {
@@ -31,26 +31,30 @@ fn print_children(dir: &Path, depth: usize, config: &Config) -> io::Result<()> {
     let max_subfiles_to_print: usize = if depth != 0 {
         config.max_subfiles
     } else {
-        let x = dir.get_child_file_count();
-        println!("children of {}: {}", dir.to_string(), x);
+        let x = dir.get_direct_child_file_count();
+        println!("children of {}: {}", dir.to_str(), x);
         x
     };
 
-    let files = dir.subfiles.clone();
-    let folders = dir.subdirs.clone();
+    let files = dir.clone_child_files();
+    let folders = dir.clone_child_dirs();
     // needs to handle 3 cases:
     // - is a dir with children
     // - is a dir without children
     // - is a file
 
     // print subfolders first
-    for subfolder in folders {
+    for mut subfolder in folders {
         // Print name of the folder
         println!(
             "{}",
-            format_spacing_cstr(format_dir(subfolder.get_item_name()), depth, tab_size)
+            format_spacing_cstr(
+                format_dir(subfolder.get_item_name().to_owned()),
+                depth,
+                tab_size
+            )
         );
-        if subfolder.is_empty() {
+        if subfolder.is_empty_dir() {
             println!(
                 "{}",
                 format_spacing_cstr(format_info("<Empty dir>".to_owned()), depth + 1, tab_size)
@@ -58,7 +62,7 @@ fn print_children(dir: &Path, depth: usize, config: &Config) -> io::Result<()> {
         }
         // Followed by it's children
         else {
-            let s: Option<&str> = match print_children(&subfolder, depth + 1, config) {
+            let s: Option<&str> = match print_children(&mut subfolder, depth + 1, config) {
                 Ok(()) => None,
                 Err(e) => match e.kind() {
                     ErrorKind::PermissionDenied => {
@@ -85,12 +89,12 @@ fn print_children(dir: &Path, depth: usize, config: &Config) -> io::Result<()> {
         let subfile = &files[x];
         println!(
             "{}",
-            format_spacing_str(subfile.get_item_name().as_str(), depth, tab_size)
+            format_spacing_str(subfile.get_item_name(), depth, tab_size)
         );
     }
     // if we skipped some, then say so here
-    if max_subfiles_to_print < dir.get_child_file_count() {
-        let unprinted_file_count = dir.get_child_file_count() - max_subfiles_to_print;
+    if max_subfiles_to_print < dir.get_direct_child_file_count() {
+        let unprinted_file_count = dir.get_direct_child_file_count() - max_subfiles_to_print;
         println!(
             "{}",
             format_spacing_cstr(
@@ -104,7 +108,7 @@ fn print_children(dir: &Path, depth: usize, config: &Config) -> io::Result<()> {
 }
 
 fn handle_args(args: Vec<String>) -> Vec<Path> {
-    let current_working_directory: PathBuf = pathj::utils::get_cwd_path();
+    let current_working_directory: PathBuf = pathj::utils::get_cwd_pathbuf();
 
     // vector to hold the paths to be searched
     let mut paths_to_search: Vec<PathBuf> = Vec::new();
