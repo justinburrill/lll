@@ -1,7 +1,7 @@
 use crate::pathj::path::*;
 
 // TODO: maybe i do need traits?
-pub fn match_string(q: &str, dir: Path<Directory>) -> Vec<Path<T>> {}
+//pub fn match_string(q: &str, dir: Path<Directory>) -> Vec<Path<T>> {}
 
 // pub fn match_string(q: &str, dir: Directory) -> Vec<Box<dyn HasPath>> {
 //     // Working example of two different objects stored in the same vec

@@ -1,28 +1,50 @@
-use std::path::PathBuf;
+use std::{
+    io::{Error, ErrorKind},
+    path::PathBuf,
+};
 
-pub struct File;
-pub struct Directory;
+#[derive(PartialEq)]
+pub enum PathType {
+    File,
+    Directory,
+}
 
-pub struct Path<T> {
+pub struct Path {
     location: PathBuf,
-    path_type: std::marker::PhantomData<T>,
+    path_type: Option<PathType>,
 }
 
-impl<T> Path<T> {
-    // fn new<R>() -> Path<R> {
-    //     Path {
-    //         location: PathBuf::new(),
-    //         path_type: R,
-    //     }
-    // }
-    fn is_file(&self) -> bool {
-        self.path_type == File
+impl Path {
+    pub fn from_str(p: &str) -> Path {
+        Path {
+            location: PathBuf::from(p),
+            path_type: Option::None,
+        }
     }
-    fn is_dir(&self) -> bool {
-        self.path_type == Directory
+    pub fn from_pathbuf(p: &PathBuf) -> Result<Path, std::io::Error> {
+        let mut path_t = Option::None;
+        if p.is_dir() {
+            path_t = Option::Some(PathType::Directory);
+        } else if p.is_file() {
+            path_t = Option::Some(PathType::File);
+        } else {
+            return Err(Error::new(
+                ErrorKind::Other,
+                format!("path {} is not a file or a directory", p.to_string_lossy()),
+            ));
+        }
+        Ok(Path {
+            location: *p,
+            path_type: path_t,
+        })
+    }
+    pub fn is_file(&self) -> bool {
+        self.path_type == Option::Some(PathType::File)
+    }
+    pub fn is_dir(&self) -> bool {
+        self.path_type == Option::Some(PathType::Directory)
+    }
+    pub fn to_str(&self) -> &str {
+        self.location.to_str().unwrap()
     }
 }
-
-impl Path<File> {}
-
-impl Path<Directory> {}

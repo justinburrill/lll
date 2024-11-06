@@ -5,7 +5,6 @@ mod input;
 use crate::config::*;
 mod pathj;
 use crate::pathj::path::*;
-use crate::pathj::{directory::*, file::*};
 use format::*;
 use std::env;
 use std::ffi::OsString;
@@ -15,7 +14,7 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 // Turn this into a wrapper function for a find_children or something? ?? i'm not happy with the way i handle the errors here
-fn print_children(dir: &Directory, depth: usize, config: &Config) -> io::Result<()> {
+fn print_children(dir: &Path, depth: usize, config: &Config) -> io::Result<()> {
     let tab_size: usize = config.tab_size;
     let max_depth: usize = config.max_depth;
     if depth > max_depth {
@@ -104,7 +103,7 @@ fn print_children(dir: &Directory, depth: usize, config: &Config) -> io::Result<
     Ok(())
 }
 
-fn handle_args(args: Vec<String>) -> Vec<PathBuf> {
+fn handle_args(args: Vec<String>) -> Vec<Path> {
     let current_working_directory: PathBuf = pathj::utils::get_cwd_path();
 
     // vector to hold the paths to be searched
@@ -114,7 +113,7 @@ fn handle_args(args: Vec<String>) -> Vec<PathBuf> {
     if args.len() > 0 {
         for arg in args {
             // copy path from the cmd line arguments
-            let path_ext = string_to_path(arg);
+            let path_ext = PathBuf::from(arg);
             // replace back slashes from user inputwith forward slashes
             //path_ext = path_ext.replace("\\", "/");
             // push the modified path ending to the cwd
@@ -129,7 +128,7 @@ fn handle_args(args: Vec<String>) -> Vec<PathBuf> {
     paths_to_search
 }
 
-fn check_found_file_count(path: &Directory, cfg: &Config) -> bool {
+fn check_found_file_count(path: &Path, cfg: &Config) -> bool {
     let continue_by_default = cfg.continue_on_file_warning_default;
     let now = Instant::now();
     let descendant_count = path.get_descendant_count();
@@ -164,7 +163,7 @@ fn check_found_file_count(path: &Directory, cfg: &Config) -> bool {
 //     })
 // }
 
-fn print_dir(dir: Directory, depth: usize, config: Config) {}
+fn print_dir(dir: &Path, depth: usize, config: Config) {}
 
 fn main() {
     // collect cmd line args
@@ -184,39 +183,38 @@ fn main() {
     // search each path
     for path in paths_to_search {
         // debug ------------
-        let d = Directory::from_pathbuf(&path);
-        println!("{:?}", d.to_string());
+        println!("{:?}", path.to_str());
 
         continue;
-        // debug ------------
-        if check_found_file_count(&d, &config) {
-            println!();
-            continue;
-        }
+        // commented for debug ------------
+        // if check_found_file_count(&d, &config) {
+        //     println!();
+        //     continue;
+        // }
 
-        let message: String = format!("Searching {}", &path.display());
-        println!("{}", format_title(message));
-        let start = Instant::now();
-        let _ = print_children(&d, 0, &config);
-        let duration = start.elapsed();
-        println!(
-            "{}",
-            format_info(format!("(completed in {:?}s)", duration.as_secs_f32()))
-        );
+        // let message: String = format!("Searching {}", &path.display());
+        // println!("{}", format_title(message));
+        // let start = Instant::now();
+        // let _ = print_children(&d, 0, &config);
+        // let duration = start.elapsed();
+        // println!(
+        //     "{}",
+        //     format_info(format!("(completed in {:?}s)", duration.as_secs_f32()))
+        // );
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use std::path::PathBuf;
+// #[cfg(test)]
+// mod tests {
+//     use std::path::PathBuf;
 
-    use crate::pathj::directory;
+//     use crate::pathj::directory;
 
-    #[test]
-    fn count_descendants() {
-        let path = PathBuf::from(r"C:\src\lll\test1");
-        let directory = directory::Directory::from_pathbuf(&path);
-        println!("{:?}", path);
-        assert_eq!(directory.get_descendant_count(), 11);
-    }
-}
+//     #[test]
+//     fn count_descendants() {
+//         let path = PathBuf::from(r"C:\src\lll\test1");
+//         let directory = directory::Directory::from_pathbuf(&path);
+//         println!("{:?}", path);
+//         assert_eq!(directory.get_descendant_count(), 11);
+//     }
+// }
