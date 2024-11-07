@@ -1,4 +1,5 @@
 use std::{
+    ffi::OsStr,
     io::{Error, ErrorKind},
     path::PathBuf,
 };
@@ -17,21 +18,25 @@ pub struct Path {
 }
 
 impl Path {
-    pub fn from_str(p: &str) -> Result<Path, std::io::Error> {
+    pub fn from_osstr(p: &OsStr) -> Path {
         Path::from_pathbuf(&PathBuf::from(p))
     }
 
-    pub fn from_pathbuf(p: &PathBuf) -> Result<Path, std::io::Error> {
+    pub fn from_str(p: &str) -> Path {
+        Path::from_pathbuf(&PathBuf::from(p))
+    }
+
+    pub fn from_pathbuf(p: &PathBuf) -> Path {
         let path_type = if p.is_dir() {
             PathType::Directory
         } else {
             PathType::File
         };
-        return Ok(Path {
+        return Path {
             location: (*p).clone(),
             path_type: path_type,
             children: Option::None,
-        });
+        };
     }
     pub fn is_file(&self) -> bool {
         self.path_type == PathType::File
@@ -54,6 +59,9 @@ impl Path {
             self.read_children();
         }
         self.children.as_ref().unwrap().len()
+    }
+    pub fn get_child_file_count_recursive(&mut self) -> usize {
+        todo!();
     }
     pub fn is_empty_dir(&mut self) -> bool {
         self.is_dir() && self.get_direct_child_file_count() == 0

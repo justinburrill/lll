@@ -111,7 +111,7 @@ fn handle_args(args: Vec<String>) -> Vec<Path> {
     let current_working_directory: PathBuf = pathj::utils::get_cwd_pathbuf();
 
     // vector to hold the paths to be searched
-    let mut paths_to_search: Vec<PathBuf> = Vec::new();
+    let mut paths_to_search: Vec<Path> = Vec::new();
 
     // if there are args given by the user,
     if args.len() > 0 {
@@ -123,19 +123,19 @@ fn handle_args(args: Vec<String>) -> Vec<Path> {
             // push the modified path ending to the cwd
             let mut path: OsString = current_working_directory.clone().into_os_string();
             path.push(path_ext.into_os_string());
-            paths_to_search.push(PathBuf::from(path));
+            paths_to_search.push(Path::from_pathbuf(&PathBuf::from(path)));
         }
     } else {
-        paths_to_search.push(current_working_directory);
+        paths_to_search.push(Path::from_pathbuf(&current_working_directory));
     }
 
     paths_to_search
 }
 
-fn check_found_file_count(path: &Path, cfg: &Config) -> bool {
+fn check_found_file_count(path: &mut Path, cfg: &Config) -> bool {
     let continue_by_default = cfg.continue_on_file_warning_default;
     let now = Instant::now();
-    let descendant_count = path.get_descendant_count();
+    let descendant_count = (*path).get_child_file_count_recursive();
     let max_count = cfg.file_count_warning_cutoff;
 
     if descendant_count > max_count {
