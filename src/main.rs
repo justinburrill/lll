@@ -121,9 +121,21 @@ fn handle_args(args: Vec<String>) -> Vec<Path> {
             // replace back slashes from user inputwith forward slashes
             //path_ext = path_ext.replace("\\", "/");
             // push the modified path ending to the cwd
-            let mut path: OsString = current_working_directory.clone().into_os_string();
-            path.push(path_ext.into_os_string());
-            paths_to_search.push(Path::from_pathbuf(&PathBuf::from(path)));
+            let mut pb = current_working_directory.clone();
+            // path.push("/");
+            pb.push(path_ext);
+            if pb.exists() {
+                if pb.is_file() {
+                    print!(
+                        "Can't search {:?} because it is a file, not a directory",
+                        pb.to_str().unwrap()
+                    );
+                } else {
+                    paths_to_search.push(Path::from_pathbuf(&pb));
+                }
+            } else {
+                print!("No such path: {:?}", pb.to_str().unwrap());
+            }
         }
     } else {
         paths_to_search.push(Path::from_pathbuf(&current_working_directory));
@@ -185,26 +197,21 @@ fn main() {
     // let config = Config::parse();
 
     // search each path
-    for path in paths_to_search {
-        // debug ------------
-        println!("{:?}", path.to_str());
+    for mut path in paths_to_search {
+        if check_found_file_count(&mut path, &config) {
+            println!();
+            continue;
+        }
 
-        continue;
-        // commented for debug ------------
-        // if check_found_file_count(&d, &config) {
-        //     println!();
-        //     continue;
-        // }
-
-        // let message: String = format!("Searching {}", &path.display());
-        // println!("{}", format_title(message));
-        // let start = Instant::now();
-        // let _ = print_children(&d, 0, &config);
-        // let duration = start.elapsed();
-        // println!(
-        //     "{}",
-        //     format_info(format!("(completed in {:?}s)", duration.as_secs_f32()))
-        // );
+        let message: String = format!("Searching {}", &path.to_str());
+        println!("{}", format_title(message));
+        let start = Instant::now();
+        let _ = print_children(&mut path, 0, &config);
+        let duration = start.elapsed();
+        println!(
+            "{}",
+            format_info(format!("(completed in {:?}s)", duration.as_secs_f32()))
+        );
     }
 }
 

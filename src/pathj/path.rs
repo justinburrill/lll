@@ -1,5 +1,6 @@
 use std::{
     ffi::OsStr,
+    fs,
     io::{Error, ErrorKind},
     path::PathBuf,
 };
@@ -61,7 +62,11 @@ impl Path {
         self.children.as_ref().unwrap().len()
     }
     pub fn get_child_file_count_recursive(&mut self) -> usize {
-        todo!();
+        let mut total: usize = self.get_direct_child_file_count();
+        for mut dir in self.clone_child_dirs() {
+            total += dir.get_child_file_count_recursive();
+        }
+        return total;
     }
     pub fn is_empty_dir(&mut self) -> bool {
         self.is_dir() && self.get_direct_child_file_count() == 0
@@ -113,7 +118,20 @@ impl Path {
     }
 
     fn read_children(&mut self) {
+        self.children = Some(vec![]);
         // set self.children to a list of paths
-        todo!()
+        let files = match fs::read_dir(&self.location) {
+            Ok(x) => x,
+            Err(e) => panic!(
+                "Can't read a file in {:?} because of {:?}",
+                self.location, e
+            ),
+        };
+        for dir_entry in files {
+            self.children
+                .as_mut()
+                .unwrap()
+                .push(Path::from_pathbuf(&dir_entry.unwrap().path()));
+        }
     }
 }

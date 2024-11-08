@@ -11,7 +11,7 @@ pub fn get_home_path() -> PathBuf {
     }
 }
 
-pub fn get_cwd_path() -> PathBuf {
+pub fn get_cwd_pathbuf() -> PathBuf {
     match env::current_dir() {
         Ok(p) => p,
         Err(e) => panic!("Error finding the current working path: {:?}", e),
