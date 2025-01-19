@@ -118,7 +118,7 @@ fn handle_args(args: Vec<String>) -> Vec<Path> {
         for arg in args {
             // copy path from the cmd line arguments
             let path_ext = PathBuf::from(arg);
-            // replace back slashes from user inputwith forward slashes
+            // replace backslashes from user inputwith forward slashes
             //path_ext = path_ext.replace("\\", "/");
             // push the modified path ending to the cwd
             let mut pb = current_working_directory.clone();

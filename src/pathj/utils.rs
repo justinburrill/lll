@@ -1,7 +1,7 @@
 use std::{env, path::PathBuf};
 
 /// Returns a [`PathBuf`] to the user's home directory
-pub fn get_home_path() -> PathBuf {
+pub fn get_home_pathbuf() -> PathBuf {
     let home_path = dirs_next::home_dir();
     match home_path {
         Some(p) => p,
