@@ -7,7 +7,6 @@ mod pathj;
 use crate::pathj::path::*;
 use format::*;
 use std::env;
-use std::ffi::OsString;
 use std::io;
 use std::io::ErrorKind;
 use std::path::PathBuf;
@@ -46,6 +45,8 @@ fn print_children(dir: &mut Path, depth: usize, config: &Config) -> io::Result<(
     // print subfolders first
     for mut subfolder in folders {
         // Print name of the folder
+
+        // TODO: check for subfolder.special_dir_action thing
         println!(
             "{}",
             format_spacing_cstr(
@@ -60,7 +61,7 @@ fn print_children(dir: &mut Path, depth: usize, config: &Config) -> io::Result<(
                 format_spacing_cstr(format_info("<Empty dir>".to_owned()), depth + 1, tab_size)
             )
         }
-        // Followed by it's children
+        // Followed by its children
         else {
             let s: Option<&str> = match print_children(&mut subfolder, depth + 1, config) {
                 Ok(()) => None,

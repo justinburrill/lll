@@ -4,11 +4,17 @@ use std::{
     io::{Error, ErrorKind},
     path::PathBuf,
 };
+use std::collections::HashMap;
 
 #[derive(PartialEq, Clone, Copy)]
 pub enum PathType {
     File,
     Directory,
+}
+
+enum SpecialDirAction {
+    GiveChildCount,
+    IgnoreEntirely
 }
 
 #[derive(Clone)]
@@ -19,6 +25,16 @@ pub struct Path {
 }
 
 impl Path {
+    pub fn is_special_dir(&self) -> Option<&SpecialDirAction> {
+        if (self.path_type != PathType::Directory) {return None;}
+        // TODO: pass in special names?
+        let mut special_names:HashMap<&str,SpecialDirAction> = HashMap::new();
+        special_names.insert(".git", SpecialDirAction::IgnoreEntirely);
+        special_names.insert("node_modules", SpecialDirAction::GiveChildCount);
+
+        return special_names.get(self.get_item_name());
+    }
+
     pub fn from_osstr(p: &OsStr) -> Path {
         Path::from_pathbuf(&PathBuf::from(p))
     }

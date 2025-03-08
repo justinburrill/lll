@@ -1,5 +1,6 @@
 # TODO list
 
+- Denote symlinks
 - Automatically collapse dirs starting with "."
 
 - fix the search ending at random files such as Config.Msi/
