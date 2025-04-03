@@ -1,18 +1,19 @@
 # TODO list
 
 - Denote symlinks
-- Automatically collapse dirs starting with "."
+
+- Automatically collapse:
+    - hidden dirs starting with "."
+    - language folders like en/ fr/ cs/ etc that all have the same files
+
 
 - fix the search ending at random files such as Config.Msi/
 
 - Improve performance
-- Write an install script
 - Improve inputted path recognition on windows (ex C:\)
 - Let the program exit gracefully on encountering permission errors
 - Give performance times after searching
 - Multi-threading
 - Support command line arguments for depth and such
-- add previews of text files
 - show file count while counting
 
-- add compact mode that just shows file count so it's easier to understand the file structure
