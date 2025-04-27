@@ -11,6 +11,10 @@ pub fn format_info(s: String) -> ColoredString {
     .italic()
 }
 
+pub fn format_other_dir(s: String) -> ColoredString {
+    (s + "/").yellow().italic()
+}
+
 pub fn format_error(s: String) -> ColoredString {
     s.red()
 }

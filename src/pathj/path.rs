@@ -1,10 +1,15 @@
-use std::{
-    ffi::OsStr,
-    fs,
-    io::{Error, ErrorKind},
-    path::PathBuf,
-};
 use std::collections::HashMap;
+use std::iter::Chain;
+use std::{ffi::OsStr, fs, path::PathBuf};
+
+use lazy_static::lazy_static;
+/// What to do upon finding any directory that we may want to handle differently,
+/// e.g. not print recursively because there's too many subfiles.
+pub enum SpecialDirAction {
+    GiveChildCount,
+    IgnoreEntirely,
+}
+extern crate lazy_static;
 
 #[derive(PartialEq, Clone, Copy)]
 pub enum PathType {
@@ -12,27 +17,40 @@ pub enum PathType {
     Directory,
 }
 
-enum SpecialDirAction {
-    GiveChildCount,
-    IgnoreEntirely
-}
-
 #[derive(Clone)]
 pub struct Path {
     location: PathBuf,
     path_type: PathType,
-    children: Option<Vec<Path>>,
+    // children: Option<Vec<Path>>,
+    child_files: Option<Vec<Path>>,
+    child_dirs: Option<Vec<Path>>,
+    descendant_count_files: Option<usize>,
+    descendant_count_dirs: Option<usize>,
+}
+
+lazy_static! {
+    static ref SpecialDirs: HashMap<String, SpecialDirAction> = {
+        let mut special_names: HashMap<String, SpecialDirAction> = HashMap::new();
+        // special_names.insert(".git".to_string(), SpecialDirAction::GiveChildCount); // not needed because everything with a . is given this by default
+        special_names.insert("node_modules".to_string(), SpecialDirAction::GiveChildCount);
+        special_names.insert("incremental".to_string(), SpecialDirAction::GiveChildCount); // rust builds
+        special_names
+    };
 }
 
 impl Path {
     pub fn is_special_dir(&self) -> Option<&SpecialDirAction> {
-        if (self.path_type != PathType::Directory) {return None;}
-        // TODO: pass in special names?
-        let mut special_names:HashMap<&str,SpecialDirAction> = HashMap::new();
-        special_names.insert(".git", SpecialDirAction::IgnoreEntirely);
-        special_names.insert("node_modules", SpecialDirAction::GiveChildCount);
+        if self.path_type != PathType::Directory {
+            return None;
+        }
 
-        return special_names.get(self.get_item_name());
+        let name = self.get_item_name();
+        let mut result = SpecialDirs.get(name);
+        result = match result {
+            None if name.starts_with('.') => Some(&SpecialDirAction::GiveChildCount),
+            _ => result,
+        };
+        return result;
     }
 
     pub fn from_osstr(p: &OsStr) -> Path {
@@ -51,8 +69,11 @@ impl Path {
         };
         return Path {
             location: (*p).clone(),
-            path_type: path_type,
-            children: Option::None,
+            path_type,
+            child_dirs: Option::None,
+            child_files: Option::None,
+            descendant_count_files: Option::None,
+            descendant_count_dirs: Option::None,
         };
     }
     pub fn is_file(&self) -> bool {
@@ -67,22 +88,40 @@ impl Path {
     pub fn get_item_name(&self) -> &str {
         self.location.file_name().unwrap().to_str().unwrap()
     }
+    pub fn get_children_if_loaded(
+        &self,
+    ) -> Option<std::iter::Chain<std::slice::Iter<'_, Path>, std::vec::IntoIter<Path>>> {
+        if self.child_dirs.is_none() || self.child_files.is_none() {
+            None
+        } else {
+            let files = self.child_files.unwrap();
+            Some(self.child_dirs.unwrap().iter().chain(files))
+        }
+    }
+
     pub fn get_direct_child_file_count(&mut self) -> usize {
         if !self.is_dir() {
             panic!("called get_child_file_count on a file not a dir!")
         }
-        if self.children.is_none() {
+        if self.get_children_if_loaded().is_none() {
             // load children into the vector if we haven't yet
             self.read_children();
         }
         self.children.as_ref().unwrap().len()
     }
-    pub fn get_child_file_count_recursive(&mut self) -> usize {
-        let mut total: usize = self.get_direct_child_file_count();
-        for mut dir in self.clone_child_dirs() {
-            total += dir.get_child_file_count_recursive();
+    pub fn get_descendant_count(&mut self) -> (usize, usize) {
+        if self.descendant_count_dirs.is_some() && self.descendant_count_files.is_some() {
+            return (
+                self.descendant_count_dirs.unwrap(),
+                self.descendant_count_files.unwrap(),
+            );
+        } else {
+            let mut total: usize = self.get_direct_child_file_count();
+            for mut dir in self.clone_child_dirs() {
+                total += dir.get_descendant_count();
+            }
+            return total;
         }
-        return total;
     }
     pub fn is_empty_dir(&mut self) -> bool {
         self.is_dir() && self.get_direct_child_file_count() == 0

@@ -44,41 +44,63 @@ fn print_children(dir: &mut Path, depth: usize, config: &Config) -> io::Result<(
 
     // print subfolders first
     for mut subfolder in folders {
-        // Print name of the folder
-
-        // TODO: check for subfolder.special_dir_action thing
-        println!(
-            "{}",
-            format_spacing_cstr(
-                format_dir(subfolder.get_item_name().to_owned()),
-                depth,
-                tab_size
-            )
-        );
-        if subfolder.is_empty_dir() {
-            println!(
-                "{}",
-                format_spacing_cstr(format_info("<Empty dir>".to_owned()), depth + 1, tab_size)
-            )
-        }
-        // Followed by its children
-        else {
-            let s: Option<&str> = match print_children(&mut subfolder, depth + 1, config) {
-                Ok(()) => None,
-                Err(e) => match e.kind() {
-                    ErrorKind::PermissionDenied => {
-                        println!("permission denied");
-                        Some("<Permission Error>")
+        let special_action = subfolder.is_special_dir();
+        let name = subfolder.get_item_name().to_owned();
+        match special_action {
+            // Print name of the folder
+            None => {
+                println!("{}", format_spacing_cstr(format_dir(name), depth, tab_size));
+                if subfolder.is_empty_dir() {
+                    // TODO is this right?
+                    println!(
+                        "{}",
+                        format_spacing_cstr(
+                            format_info("<Empty dir>".to_owned()),
+                            depth + 1,
+                            tab_size
+                        )
+                    )
+                }
+                // Followed by its children
+                else {
+                    let err_text: Option<&str> =
+                        match print_children(&mut subfolder, depth + 1, config) {
+                            Ok(()) => None, // no error yay
+                            Err(e) => match e.kind() {
+                                ErrorKind::PermissionDenied => {
+                                    println!("permission denied");
+                                    Some("<Permission Error>")
+                                }
+                                _ => Some("<Unknown Error>"),
+                            },
+                        };
+                    if err_text.is_some() {
+                        println!(
+                            "{}",
+                            format_spacing_cstr(
+                                format_error(err_text.unwrap().to_owned()),
+                                depth + 1,
+                                tab_size
+                            )
+                        )
                     }
-                    _ => Some("<Unknown Error>"),
-                },
-            };
-            if s.is_some() {
-                println!(
-                    "{}",
-                    format_spacing_cstr(format_error(s.unwrap().to_owned()), depth + 1, tab_size)
-                )
+                }
             }
+            Some(action) => match action {
+                SpecialDirAction::GiveChildCount => println!(
+                    "{}",
+                    format_spacing_cstr(
+                        format_other_dir(format!(
+                            "{}: {} children",
+                            name,
+                            subfolder.get_descendant_count()
+                        )),
+                        depth,
+                        tab_size
+                    )
+                ),
+                SpecialDirAction::IgnoreEntirely => (), // do nothing!
+            },
         }
     }
 
@@ -148,7 +170,7 @@ fn handle_args(args: Vec<String>) -> Vec<Path> {
 fn check_found_file_count(path: &mut Path, cfg: &Config) -> bool {
     let continue_by_default = cfg.continue_on_file_warning_default;
     let now = Instant::now();
-    let descendant_count = (*path).get_child_file_count_recursive();
+    let descendant_count = (*path).get_descendant_count();
     let max_count = cfg.file_count_warning_cutoff;
 
     if descendant_count > max_count {
