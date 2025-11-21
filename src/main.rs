@@ -8,21 +8,28 @@ use format::*;
 use std::env;
 use std::io;
 use std::io::ErrorKind;
+use std::io::Write;
 use std::path::PathBuf;
 use std::time::Instant;
 
-fn print_children(dir: &mut Path, depth: usize, config: &Config) -> io::Result<()> {
+fn print_children(
+    dir: &mut Path,
+    depth: usize,
+    config: &Config,
+    stdout_lock: &mut io::StdoutLock,
+) -> io::Result<()> {
     let tab_size: usize = config.tab_size;
     let max_depth: usize = config.max_depth;
     if depth > max_depth {
-        println!(
+        writeln!(
+            stdout_lock,
             "{}",
             format_spacing_cstr(
                 format_info("<Max depth reached>".to_string()),
                 depth,
                 tab_size
             )
-        );
+        )?;
         return Ok(());
     }
 
@@ -30,7 +37,7 @@ fn print_children(dir: &mut Path, depth: usize, config: &Config) -> io::Result<(
         config.max_subfiles
     } else {
         let count = dir.get_descendant_count();
-        println!("children of {}: {}", dir.to_str(), count);
+        writeln!(stdout_lock, "children of {}: {}", dir.to_str(), count)?;
         count
     };
 
@@ -47,52 +54,63 @@ fn print_children(dir: &mut Path, depth: usize, config: &Config) -> io::Result<(
         match special_action {
             // Print name of the folder
             None => {
-                println!("{}", format_spacing_cstr(format_dir(name), depth, tab_size));
+                writeln!(
+                    stdout_lock,
+                    "{}",
+                    format_spacing_cstr(format_dir(name), depth, tab_size)
+                )?;
                 if subdir.is_empty_dir() {
-                    println!(
+                    writeln!(
+                        stdout_lock,
                         "{}",
                         format_spacing_cstr(
                             format_info("<Empty dir>".to_owned()),
                             depth + 1,
                             tab_size
                         )
-                    )
+                    )?;
                 }
                 // Followed by its children
                 else {
                     let err_text: Option<&str> =
-                        match print_children(&mut subdir, depth + 1, config) {
+                        match print_children(&mut subdir, depth + 1, config, stdout_lock) {
                             Ok(()) => None, // no error yay
                             Err(e) => match e.kind() {
                                 ErrorKind::PermissionDenied => {
-                                    println!("permission denied");
+                                    writeln!(stdout_lock, "permission denied")?;
                                     Some("<Permission Error>")
                                 }
                                 _ => Some("<Unknown Error>"),
                             },
                         };
                     if err_text.is_some() {
-                        println!(
+                        writeln!(
+                            stdout_lock,
                             "{}",
                             format_spacing_cstr(
                                 format_error(err_text.unwrap().to_owned()),
                                 depth + 1,
                                 tab_size
                             )
-                        )
+                        )?;
                     }
                 }
             }
             Some(action) => match action {
-                SpecialDirAction::GiveChildCount => println!("{}", {
-                    let (dir_count, file_count) = subdir.get_descendant_counts();
-                    format_spacing_cstr(
-                        format_other_dir(format!("{}: {} folders, {} files", name, dir_count, file_count)),
-                        depth,
-                        tab_size,
-                    )
-                }),
-                SpecialDirAction::IgnoreEntirely => (), // do nothing!
+                SpecialDirAction::GiveChildCount => {
+                    writeln!(stdout_lock, "{}", {
+                        let (dir_count, file_count) = subdir.get_descendant_counts();
+                        format_spacing_cstr(
+                            format_other_dir(format!(
+                                "{}: {} folders, {} files",
+                                name, dir_count, file_count
+                            )),
+                            depth,
+                            tab_size,
+                        )
+                    })?;
+                }
+                SpecialDirAction::IgnoreEntirely => {}, // do nothing!
             },
         }
     }
@@ -103,22 +121,24 @@ fn print_children(dir: &mut Path, depth: usize, config: &Config) -> io::Result<(
             break;
         }
         let subfile = &subfiles[x];
-        println!(
+        writeln!(
+            stdout_lock,
             "{}",
             format_spacing_str(subfile.get_item_name(), depth, tab_size)
-        );
+        )?;
     }
     // if we skipped some, then say so here
     if max_subfiles_to_print < dir.get_direct_child_file_count() {
         let unprinted_file_count = dir.get_direct_child_file_count() - max_subfiles_to_print;
-        println!(
+        writeln!(
+            stdout_lock,
             "{}",
             format_spacing_cstr(
                 format_info(format!("<{} more files>", unprinted_file_count)),
                 depth,
                 tab_size
             )
-        );
+        )?;
     }
     Ok(())
 }
@@ -206,8 +226,11 @@ fn main() {
             println!();
             continue;
         }
+
         let start = Instant::now();
-        let _ = print_children(&mut path, 0, &config);
+        let stdout = io::stdout();
+        let mut lock = stdout.lock();
+        let _ = print_children(&mut path, 0, &config, &mut lock);
         let duration = start.elapsed();
         println!(
             "{}",

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use std::{ffi::OsStr, fs, path::PathBuf};
+use std::{fs, path::PathBuf};
 
 use lazy_static::lazy_static;
 extern crate lazy_static;
@@ -12,13 +12,13 @@ pub enum SpecialDirAction {
     IgnoreEntirely,
 }
 
-#[derive(PartialEq, Clone, Copy)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 pub enum PathType {
     File,
     Directory,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Path {
     location: PathBuf,
     path_type: PathType,
@@ -54,14 +54,6 @@ impl Path {
         return result;
     }
 
-    pub fn from_osstr(p: &OsStr) -> Path {
-        Path::from_pathbuf(&PathBuf::from(p))
-    }
-
-    pub fn from_str(p: &str) -> Path {
-        Path::from_pathbuf(&PathBuf::from(p))
-    }
-
     pub fn from_pathbuf(p: &PathBuf) -> Path {
         let path_type = if p.is_dir() {
             PathType::Directory
@@ -78,9 +70,9 @@ impl Path {
         };
     }
 
-    pub fn is_file(&self) -> bool {
-        self.path_type == PathType::File
-    }
+    // pub fn is_file(&self) -> bool {
+    //     self.path_type == PathType::File
+    // }
 
     pub fn is_dir(&self) -> bool {
         self.path_type == PathType::Directory
@@ -95,9 +87,8 @@ impl Path {
     }
 
     pub fn is_loaded(&self) -> bool {
-        self.descendant_count_dirs.is_some() && self.descendant_count_files.is_some()
+        self.child_dirs.is_some() && self.child_files.is_some()
     }
-
 
     pub fn get_direct_child_dir_count(&mut self) -> usize {
         if !self.is_dir() {
@@ -105,6 +96,7 @@ impl Path {
         }
         if !self.is_loaded() {
             // load children into the vector if we haven't yet
+            // println!("reading from get_direct_child_dir_count {:?} {:?}", self.child_dirs, self.child_files);
             self.read_children();
         }
         self.child_dirs.as_ref().unwrap().len()
@@ -116,13 +108,14 @@ impl Path {
         }
         if !self.is_loaded() {
             // load children into the vector if we haven't yet
+            // println!("reading from get_direct_child_file_count {:?} {:?}", self.child_dirs, self.child_files);
             self.read_children();
         }
         self.child_files.as_ref().unwrap().len()
     }
 
     pub fn get_descendant_counts(&mut self) -> (usize, usize) {
-        if self.is_loaded() {
+        if self.descendant_count_dirs.is_some() && self.descendant_count_files.is_some() {
             return (
                 self.descendant_count_dirs.unwrap(),
                 self.descendant_count_files.unwrap(),
@@ -148,76 +141,19 @@ impl Path {
         self.is_dir() && self.get_descendant_count() == 0
     }
 
-    pub fn get_child_files(&mut self) -> &mut Vec<Path> {
-        if !self.is_loaded() {
-            self.read_children();
-        }
-        return self.child_files.as_mut().unwrap();
-    }
-
-    pub fn get_child_dirs(&mut self) -> &mut Vec<Path> {
-        if !self.is_loaded() {
-            self.read_children();
-        }
-        return self.child_dirs.as_mut().unwrap();
-    }
-
     pub fn get_children(&mut self) -> (&mut Vec<Path>, &mut Vec<Path>) {
         if !self.is_loaded() {
+            // println!("reading from get_children {:?} {:?}", self.child_dirs, self.child_files);
             self.read_children();
         }
-        return (self.child_dirs.as_mut().unwrap(), self.child_files.as_mut().unwrap());
+        return (
+            self.child_dirs.as_mut().unwrap(),
+            self.child_files.as_mut().unwrap(),
+        );
     }
 
-    // fn get_path_type(&mut self) -> PathType {
-    //     let p = &self.location;
-    //     if p.is_dir() {
-    //         return Option::Some(PathType::Directory);
-    //     } else if p.is_file() {
-    //         return Option::Some(PathType::File);
-    //     } else {
-    //         panic!("path {} is not a file or a directory", p.to_string_lossy())
-    //     }
-    // }
-
-    // pub fn clone_path_type(&mut self) -> PathType {
-    //     match &self.path_type {
-    //         Some(x) => x.clone(),
-    //         None => {
-    //             self.get_path_type();
-    //             self.clone_path_type()
-    //         }
-    //     }
-    // }
-
-    // pub fn clone_children(&mut self) -> Vec<Path> {
-    //     match &self.children {
-    //         Some(x) => x.to_vec(),
-    //         None => {
-    //             self.read_children();
-    //             self.clone_children()
-    //         }
-    //     }
-    // }
-
-    // pub fn clone_child_files(&mut self) -> Vec<Path> {
-    //     self.clone_children()
-    //         .into_iter()
-    //         .filter(|x| x.is_file())
-    //         .collect()
-    // }
-
-    // pub fn clone_child_dirs(&mut self) -> Vec<Path> {
-    //     self.clone_children()
-    //         .into_iter()
-    //         .filter(|x| x.is_dir())
-    //         .collect()
-    // }
-
     fn read_children(&mut self) {
-        self.child_files = Some(vec![]);
-        self.child_dirs = Some(vec![]);
-        // set self.children to a list of paths
+        println!("reading {:?}", self.location);
         let children = match fs::read_dir(&self.location) {
             Ok(x) => x,
             Err(e) => panic!(
