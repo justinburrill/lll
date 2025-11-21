@@ -1,5 +1,4 @@
 mod config;
-mod find;
 mod format;
 mod input;
 use crate::config::*;
@@ -12,7 +11,6 @@ use std::io::ErrorKind;
 use std::path::PathBuf;
 use std::time::Instant;
 
-// Turn this into a wrapper function for a find_children or something? ?? i'm not happy with the way i handle the errors here
 fn print_children(dir: &mut Path, depth: usize, config: &Config) -> io::Result<()> {
     let tab_size: usize = config.tab_size;
     let max_depth: usize = config.max_depth;
@@ -27,31 +25,30 @@ fn print_children(dir: &mut Path, depth: usize, config: &Config) -> io::Result<(
         );
         return Ok(());
     }
+
     let max_subfiles_to_print: usize = if depth != 0 {
         config.max_subfiles
     } else {
-        let x = dir.get_direct_child_file_count();
-        println!("children of {}: {}", dir.to_str(), x);
-        x
+        let count = dir.get_descendant_count();
+        println!("children of {}: {}", dir.to_str(), count);
+        count
     };
 
-    let files = dir.clone_child_files();
-    let folders = dir.clone_child_dirs();
     // needs to handle 3 cases:
     // - is a dir with children
     // - is a dir without children
     // - is a file
+    let (subdirs, subfiles) = dir.get_children();
 
     // print subfolders first
-    for mut subfolder in folders {
-        let special_action = subfolder.is_special_dir();
-        let name = subfolder.get_item_name().to_owned();
+    for mut subdir in subdirs {
+        let special_action = subdir.is_special_dir();
+        let name = subdir.get_item_name().to_owned();
         match special_action {
             // Print name of the folder
             None => {
                 println!("{}", format_spacing_cstr(format_dir(name), depth, tab_size));
-                if subfolder.is_empty_dir() {
-                    // TODO is this right?
+                if subdir.is_empty_dir() {
                     println!(
                         "{}",
                         format_spacing_cstr(
@@ -64,7 +61,7 @@ fn print_children(dir: &mut Path, depth: usize, config: &Config) -> io::Result<(
                 // Followed by its children
                 else {
                     let err_text: Option<&str> =
-                        match print_children(&mut subfolder, depth + 1, config) {
+                        match print_children(&mut subdir, depth + 1, config) {
                             Ok(()) => None, // no error yay
                             Err(e) => match e.kind() {
                                 ErrorKind::PermissionDenied => {
@@ -87,18 +84,14 @@ fn print_children(dir: &mut Path, depth: usize, config: &Config) -> io::Result<(
                 }
             }
             Some(action) => match action {
-                SpecialDirAction::GiveChildCount => println!(
-                    "{}",
+                SpecialDirAction::GiveChildCount => println!("{}", {
+                    let (dir_count, file_count) = subdir.get_descendant_counts();
                     format_spacing_cstr(
-                        format_other_dir(format!(
-                            "{}: {} children",
-                            name,
-                            subfolder.get_descendant_count()
-                        )),
+                        format_other_dir(format!("{}: {} folders, {} files", name, dir_count, file_count)),
                         depth,
-                        tab_size
+                        tab_size,
                     )
-                ),
+                }),
                 SpecialDirAction::IgnoreEntirely => (), // do nothing!
             },
         }
@@ -106,10 +99,10 @@ fn print_children(dir: &mut Path, depth: usize, config: &Config) -> io::Result<(
 
     // followed by subfiles
     for x in 0..max_subfiles_to_print {
-        if x == files.len() {
+        if x == subfiles.len() {
             break;
         }
-        let subfile = &files[x];
+        let subfile = &subfiles[x];
         println!(
             "{}",
             format_spacing_str(subfile.get_item_name(), depth, tab_size)
@@ -170,8 +163,9 @@ fn handle_args(args: Vec<String>) -> Vec<Path> {
 fn check_found_file_count(path: &mut Path, cfg: &Config) -> bool {
     let continue_by_default = cfg.continue_on_file_warning_default;
     let now = Instant::now();
-    let descendant_count = (*path).get_descendant_count();
+    let (dirs, files) = (*path).get_descendant_counts();
     let max_count = cfg.file_count_warning_cutoff;
+    let descendant_count = dirs + files;
 
     if descendant_count > max_count {
         let time = now.elapsed().as_secs_f32();
@@ -187,22 +181,6 @@ fn check_found_file_count(path: &mut Path, cfg: &Config) -> bool {
     }
     return false;
 }
-
-// fn assemble_dir(path: PathBuf, depth: usize, max_depth: usize) -> io::Result<Directory> {
-//     let mut subdirs: Vec<Directory> = Vec::new();
-//     let folders: Vec<Directory> = path.subdirs;
-//     for folder in folders {
-//         subdirs.push(assemble_dir(&folder, depth + 1, max_depth)?);
-//     }
-//     let files: Vec<File> = path.subfiles;
-//     Ok(Directory {
-//         path: path.clone(),
-//         subdirs,
-//         subfiles: files,
-//     })
-// }
-
-fn print_dir(dir: &Path, depth: usize, config: Config) {}
 
 fn main() {
     // collect cmd line args
@@ -221,13 +199,13 @@ fn main() {
 
     // search each path
     for mut path in paths_to_search {
+        let message: String = format!("Searching {}", &path.to_str());
+        println!("{}", format_title(message));
+
         if check_found_file_count(&mut path, &config) {
             println!();
             continue;
         }
-
-        let message: String = format!("Searching {}", &path.to_str());
-        println!("{}", format_title(message));
         let start = Instant::now();
         let _ = print_children(&mut path, 0, &config);
         let duration = start.elapsed();
@@ -237,18 +215,3 @@ fn main() {
         );
     }
 }
-
-// #[cfg(test)]
-// mod tests {
-//     use std::path::PathBuf;
-
-//     use crate::pathj::directory;
-
-//     #[test]
-//     fn count_descendants() {
-//         let path = PathBuf::from(r"C:\src\lll\test1");
-//         let directory = directory::Directory::from_pathbuf(&path);
-//         println!("{:?}", path);
-//         assert_eq!(directory.get_descendant_count(), 11);
-//     }
-// }

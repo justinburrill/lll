@@ -1,5 +1,4 @@
 # TODO list
-
 - Denote symlinks
 
 - Automatically collapse:
