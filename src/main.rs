@@ -36,7 +36,7 @@ fn print_children(
     let max_subfiles_to_print: usize = if depth != 0 {
         config.max_subfiles
     } else {
-        let count = dir.get_descendant_count();
+        let count = dir.get_descendant_count()?;
         writeln!(stdout_lock, "children of {}: {}", dir.to_str(), count)?;
         count
     };
@@ -45,7 +45,7 @@ fn print_children(
     // - is a dir with children
     // - is a dir without children
     // - is a file
-    let (subdirs, subfiles) = dir.get_children();
+    let (subdirs, subfiles) = dir.get_children()?;
 
     // print subfolders first
     for mut subdir in subdirs {
@@ -59,7 +59,7 @@ fn print_children(
                     "{}",
                     format_spacing_cstr(format_dir(name), depth, tab_size)
                 )?;
-                if subdir.is_empty_dir() {
+                if subdir.is_empty_dir()? {
                     writeln!(
                         stdout_lock,
                         "{}",
@@ -99,7 +99,7 @@ fn print_children(
             Some(action) => match action {
                 SpecialDirAction::GiveChildCount => {
                     writeln!(stdout_lock, "{}", {
-                        let (dir_count, file_count) = subdir.get_descendant_counts();
+                        let (dir_count, file_count) = subdir.get_descendant_counts()?;
                         format_spacing_cstr(
                             format_other_dir(format!(
                                 "{}: {} folders, {} files",
@@ -128,8 +128,8 @@ fn print_children(
         )?;
     }
     // if we skipped some, then say so here
-    if max_subfiles_to_print < dir.get_direct_child_file_count() {
-        let unprinted_file_count = dir.get_direct_child_file_count() - max_subfiles_to_print;
+    if max_subfiles_to_print < dir.get_direct_child_file_count()? {
+        let unprinted_file_count = dir.get_direct_child_file_count()? - max_subfiles_to_print;
         writeln!(
             stdout_lock,
             "{}",
@@ -180,10 +180,10 @@ fn handle_args(args: Vec<String>) -> Vec<Path> {
     paths_to_search
 }
 
-fn check_found_file_count(path: &mut Path, cfg: &Config) -> bool {
+fn check_found_file_count(path: &mut Path, cfg: &Config) -> io::Result<bool> {
     let continue_by_default = cfg.continue_on_file_warning_default;
     let now = Instant::now();
-    let (dirs, files) = (*path).get_descendant_counts();
+    let (dirs, files) = (*path).get_descendant_counts()?;
     let max_count = cfg.file_count_warning_cutoff;
     let descendant_count = dirs + files;
 
@@ -193,13 +193,13 @@ fn check_found_file_count(path: &mut Path, cfg: &Config) -> bool {
         let time_info = format_info(format!("(counted in {}s)", time.to_string()));
         if input::bool_input(&format!("{} {}", prompt, time_info), continue_by_default) {
             // keep going :)
-            return false;
+            return Ok(false);
         } else {
             // dont keep going :(
-            return true;
+            return Ok(true);
         }
     }
-    return false;
+    return Ok(false);
 }
 
 fn main() {
@@ -222,7 +222,7 @@ fn main() {
         let message: String = format!("Searching {}", &path.to_str());
         println!("{}", format_title(message));
 
-        if check_found_file_count(&mut path, &config) {
+        if check_found_file_count(&mut path, &config).expect("Failed to read path:"){
             println!();
             continue;
         }
@@ -237,4 +237,5 @@ fn main() {
             format_info(format!("(completed in {:?}s)", duration.as_secs_f32()))
         );
     }
+
 }
