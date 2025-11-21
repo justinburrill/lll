@@ -222,7 +222,7 @@ fn main() {
         let message: String = format!("Searching {}", &path.to_str());
         println!("{}", format_title(message));
 
-        if check_found_file_count(&mut path, &config).expect("Failed to read path:"){
+        if check_found_file_count(&mut path, &config).expect("Failed to read path:") {
             println!();
             continue;
         }

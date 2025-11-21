@@ -123,7 +123,7 @@ impl Path {
             let mut total_dirs: usize = self.get_direct_child_dir_count()?;
             let mut total_files: usize = self.get_direct_child_file_count()?;
             for dir in self.child_dirs.as_mut().unwrap() {
-                let totals = dir.get_descendant_counts()?;
+                let totals = dir.get_descendant_counts().unwrap_or((0, 0));
                 total_dirs += totals.0;
                 total_files += totals.1;
             }
