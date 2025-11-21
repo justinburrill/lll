@@ -96,7 +96,6 @@ impl Path {
         }
         if !self.is_loaded() {
             // load children into the vector if we haven't yet
-            // println!("reading from get_direct_child_dir_count {:?} {:?}", self.child_dirs, self.child_files);
             self.read_children();
         }
         self.child_dirs.as_ref().unwrap().len()
@@ -108,7 +107,6 @@ impl Path {
         }
         if !self.is_loaded() {
             // load children into the vector if we haven't yet
-            // println!("reading from get_direct_child_file_count {:?} {:?}", self.child_dirs, self.child_files);
             self.read_children();
         }
         self.child_files.as_ref().unwrap().len()
@@ -143,7 +141,6 @@ impl Path {
 
     pub fn get_children(&mut self) -> (&mut Vec<Path>, &mut Vec<Path>) {
         if !self.is_loaded() {
-            // println!("reading from get_children {:?} {:?}", self.child_dirs, self.child_files);
             self.read_children();
         }
         return (
@@ -153,7 +150,6 @@ impl Path {
     }
 
     fn read_children(&mut self) {
-        println!("reading {:?}", self.location);
         let children = match fs::read_dir(&self.location) {
             Ok(x) => x,
             Err(e) => panic!(
