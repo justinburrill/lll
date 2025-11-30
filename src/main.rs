@@ -110,7 +110,7 @@ fn print_children(
                         )
                     })?;
                 }
-                SpecialDirAction::IgnoreEntirely => {}, // do nothing!
+                SpecialDirAction::IgnoreEntirely => {} // do nothing!
             },
         }
     }
@@ -182,14 +182,14 @@ fn handle_args(args: Vec<String>) -> Vec<Path> {
 
 fn check_found_file_count(path: &mut Path, cfg: &Config) -> io::Result<bool> {
     let continue_by_default = cfg.continue_on_file_warning_default;
+    let max_count = cfg.file_count_warning_cutoff;
     let now = Instant::now();
     let (dirs, files) = (*path).get_descendant_counts()?;
-    let max_count = cfg.file_count_warning_cutoff;
     let descendant_count = dirs + files;
 
     if descendant_count > max_count {
         let time = now.elapsed().as_secs_f32();
-        let prompt = format!("Warning: {} items - continue?", descendant_count);
+        let prompt = format!("Counted {} items - continue?", descendant_count);
         let time_info = format_info(format!("(counted in {}s)", time.to_string()));
         if input::bool_input(&format!("{} {}", prompt, time_info), continue_by_default) {
             // keep going :)
@@ -209,13 +209,13 @@ fn main() {
     let config = Config {
         show_hidden_files: false,
         continue_on_file_warning_default: true,
-        file_count_warning_cutoff: 100,
+        file_count_warning_cutoff: 1000,
         tab_size: 4,
         max_depth: 5,
         max_subfiles: 5,
     };
 
-    // let config = Config::parse();
+    // let config = Config::parse(); // planning to use clap eventually
 
     // search each path
     for mut path in paths_to_search {
@@ -237,5 +237,4 @@ fn main() {
             format_info(format!("(completed in {:?}s)", duration.as_secs_f32()))
         );
     }
-
 }
