@@ -36,9 +36,7 @@ fn print_children(
     let max_subfiles_to_print: usize = if depth != 0 {
         config.max_subfiles
     } else {
-        let count = dir.get_descendant_count()?;
-        writeln!(stdout_lock, "children of {}: {}", dir.to_str(), count)?;
-        count
+        dir.get_descendant_count()?
     };
 
     // needs to handle 3 cases:
